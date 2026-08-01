@@ -21,6 +21,8 @@ from .config import APP_DIR
 
 def lock_workstation() -> bool:
     """立即锁定工作站。"""
+    if sys.platform != "win32":
+        return False
     try:
         return bool(ctypes.windll.user32.LockWorkStation())
     except Exception:
@@ -32,31 +34,41 @@ def suspend(sleep: bool = True) -> bool:
 
     SetSuspendState(Hibernate, ForceCritical, DisableWakeEvent)
     """
+    if sys.platform != "win32":
+        return False
     try:
         hibernate = 0 if sleep else 1
-        return bool(ctypes.windll.powrprof.SetSuspendState(hibernate, 1, 0))
+        return bool(ctypes.windll.powrprof.SetSuspendState(hibernate, 0, 0))  # ForceCritical=0
     except Exception:
         return False
 
 
 def is_workstation_locked() -> bool:
-    """粗略判断当前是否处于锁屏状态。
-
-    通过检测前台窗口所属进程是否为 LogonUI。锁屏时该方法不可靠，
-    这里用 OpenInputDesktop 名字判断更准。
-    """
+    """粗略判断当前是否处于锁屏状态。"""
+    if sys.platform != "win32":
+        return False
     try:
+        import ctypes.wintypes
         user32 = ctypes.windll.user32
         DESKTOP_READOBJECTS = 0x0001
         DESKTOP_READCONTROL = 0x0002
-        hdesk = user32.OpenInputDesktop(0, False, DESKTOP_READOBJECTS | DESKTOP_READCONTROL)
+        # 设置函数签名（64位句柄正确处理）
+        user32.OpenInputDesktop.restype = ctypes.wintypes.HDESK
+        user32.OpenInputDesktop.argtypes = [ctypes.wintypes.BOOL, ctypes.wintypes.BOOL, ctypes.wintypes.DWORD]
+        user32.GetUserObjectInformationW.restype = ctypes.wintypes.BOOL
+        user32.GetUserObjectInformationW.argtypes = [ctypes.wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, ctypes.wintypes.DWORD, ctypes.POINTER(ctypes.wintypes.DWORD)]
+        user32.CloseDesktop.restype = ctypes.wintypes.BOOL
+        user32.CloseDesktop.argtypes = [ctypes.wintypes.HDESK]
+
+        hdesk = user32.OpenInputDesktop(False, False, DESKTOP_READOBJECTS | DESKTOP_READCONTROL)
         if not hdesk:
             return True
         buf = ctypes.create_unicode_buffer(256)
-        user32.GetUserObjectInformationW(hdesk, 2, buf, 512, None)  # UOI_NAME=2
+        ok = user32.GetUserObjectInformationW(hdesk, 2, buf, 512, None)
         user32.CloseDesktop(hdesk)
+        if not ok:
+            return False  # 无法判定，按未锁处理
         name = buf.value
-        # 锁屏桌面名为 "Winlogon"，正常为 "default"
         return name.lower() != "default"
     except Exception:
         return False
@@ -115,4 +127,7 @@ def current_executable() -> Path:
     """返回打包后 / 开发环境下的可执行路径。"""
     if getattr(sys, "frozen", False):
         return Path(sys.executable)
-    return Path(sys.argv[0]).resolve()
+    argv0 = sys.argv[0] if sys.argv else ""
+    if not argv0:
+        return Path(sys.executable).resolve()
+    return Path(argv0).resolve()

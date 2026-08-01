@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import io
 import logging
 import threading
 
@@ -29,30 +28,38 @@ class OverlayWindow:
         self._lock = threading.Lock()
         self._visible = False
         self._tk_thread = None
+        self._ready = threading.Event()
+        self._stopping = False
 
     def _build(self):
         import tkinter as tk
-        self._root = tk.Tk()
-        self._root.title("FaceGuard 识别画面")
-        self._root.overrideredirect(True)  # 无边框
-        # 居中靠右上
-        sw = self._root.winfo_screenwidth()
-        self._root.geometry(f"{self.width}x{self.height}+{sw - self.width - 20}+20")
         try:
-            self._root.attributes("-topmost", True)
-            self._root.attributes("-alpha", 0.95)
-        except tk.TclError:
-            pass
-        self._label = tk.Label(self._root, bg="black")
-        self._label.pack(fill="both", expand=True)
-        self._root.withdraw()  # 默认隐藏
+            self._root = tk.Tk()
+            self._root.title("FaceGuard 识别画面")
+            self._root.overrideredirect(True)  # 无边框
+            # 居中靠右上
+            sw = self._root.winfo_screenwidth()
+            self._root.geometry(f"{self.width}x{self.height}+{sw - self.width - 20}+20")
+            try:
+                self._root.attributes("-topmost", True)
+                self._root.attributes("-alpha", 0.95)
+            except tk.TclError:
+                pass
+            self._label = tk.Label(self._root, bg="black")
+            self._label.pack(fill="both", expand=True)
+            self._root.withdraw()  # 默认隐藏
+        except Exception as e:
+            log.error("overlay 窗口构建失败: %s", e)
+            self._root = None
+        finally:
+            self._ready.set()
 
     def start(self):
-        import tkinter as tk
-        if self._root is not None:
+        if self._tk_thread is not None and self._tk_thread.is_alive():
             return
         self._tk_thread = threading.Thread(target=self._run_tk, daemon=True)
         self._tk_thread.start()
+        self._ready.wait(timeout=3.0)
 
     def _run_tk(self):
         try:
@@ -75,21 +82,28 @@ class OverlayWindow:
 
     def update_frame(self, frame_bgr: np.ndarray):
         """推送一帧到窗口（线程安全）。"""
+        if self._stopping:
+            return
         if self._root is None or self._label is None:
             return
         try:
             rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(rgb)
-            img = img.resize((self.width, self.height))
-            photo = ImageTk.PhotoImage(img)
+            img = Image.fromarray(rgb).resize((self.width, self.height))
             def _set():
-                self._photo = photo  # 保持引用
-                self._label.configure(image=photo)
+                if self._stopping:
+                    return
+                try:
+                    photo = ImageTk.PhotoImage(img)
+                    self._photo = photo  # 保持引用
+                    self._label.configure(image=photo)
+                except Exception as e:
+                    log.debug("overlay 设置图像失败: %s", e)
             self._root.after(0, _set)
         except Exception as e:
             log.debug("overlay 更新失败: %s", e)
 
     def stop(self):
+        self._stopping = True
         if self._root is not None:
             try:
                 self._root.after(0, self._root.destroy)

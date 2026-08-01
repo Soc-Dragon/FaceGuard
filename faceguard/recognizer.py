@@ -48,13 +48,17 @@ class Recognizer:
         self.confirm_frames = self.cfg.get("confirm_frames", 3)
         self.match_window = self.cfg.get("match_window", 5)
         # 自适应学习配置
-        self.adaptive = cfg.get("adaptive", {"enabled": True, "max_samples_per_user": 30,
-                                              "learn_threshold": 0.7, "cooldown_seconds": 300})
+        _adaptive_cfg = cfg.get("adaptive") or {}
+        if not isinstance(_adaptive_cfg, dict):
+            _adaptive_cfg = {}
+        self.adaptive = {"enabled": True, "max_samples_per_user": 30,
+                         "learn_threshold": 0.7, "cooldown_seconds": 300}
+        self.adaptive.update(_adaptive_cfg)
         self.detector = None
         self.recognizer = None
         self._rec_type = "opencv_sf"  # opencv_sf / onnx_dnn
         self._rec_info = None
-        self._hits = deque(maxlen=self.match_window)
+        self._hits = deque(maxlen=max(self.match_window, self.confirm_frames))
         self._db: list[tuple[str, np.ndarray]] = []
         self._loaded = False
         # 自适应学习状态
@@ -95,8 +99,10 @@ class Recognizer:
                 self.recognizer = cv2.dnn.readNetFromONNX(str(rec_path))
             log.info(f"识别模型加载完成: {self._rec_info['name']} ({self._rec_info['desc']})")
             return True
-        except cv2.error as e:
+        except Exception as e:
             log.error("模型加载失败: %s", e)
+            self.detector = None
+            self.recognizer = None
             return False
 
     # ---------- 特征库 ----------
@@ -111,21 +117,31 @@ class Recognizer:
                 self._db = [(str(n), np.asarray(v, dtype=np.float32))
                             for n, v in zip(data["names"], data["embeddings"])]
                 log.info("已加载 %d 张注册人脸", len(self._db))
+            except FileNotFoundError:
+                self._loaded = True
             except Exception as e:
                 log.warning("人脸库读取失败: %s", e)
+                # 不设 _loaded，允许下次重试
+                return len(self._db)
         # 加载学习历史
         self._load_learn_history()
         self._loaded = True
         return len(self._db)
 
     def save_db(self) -> None:
-        names = [n for n, _ in self._db]
-        embs = [e for _, e in self._db]
-        if names:
-            np.savez(str(FACES_DB), names=np.array(names, dtype=object),
-                     embeddings=np.array(embs, dtype=np.float32))
-        else:
-            FACES_DB.unlink(missing_ok=True)
+        import os
+        try:
+            names = [n for n, _ in self._db]
+            embs = [e for _, e in self._db]
+            if names:
+                tmp = str(FACES_DB) + ".tmp"
+                np.savez(tmp, names=np.array(names, dtype=object),
+                         embeddings=np.array(embs, dtype=object))
+                os.replace(tmp, str(FACES_DB))
+            else:
+                FACES_DB.unlink(missing_ok=True)
+        except Exception as e:
+            log.warning("人脸库保存失败: %s", e)
 
     def enroll(self, name: str, embedding: np.ndarray) -> None:
         self.load_db()
@@ -136,8 +152,14 @@ class Recognizer:
     def clear_db(self) -> None:
         self._db.clear()
         self._learn_history.clear()
-        self._save_learn_history()
-        self.save_db()
+        try:
+            self._save_learn_history()
+        except Exception as e:
+            log.warning("清除学习历史失败: %s", e)
+        try:
+            self.save_db()
+        except Exception as e:
+            log.warning("清除人脸库失败: %s", e)
 
     def has_enrolled(self) -> bool:
         self.load_db()
@@ -150,9 +172,16 @@ class Recognizer:
         if LEARN_DB.exists():
             try:
                 data = np.load(str(LEARN_DB), allow_pickle=True)
+                names = data["names"]
+                embs = data["embeddings"]
+                scores = data["scores"]
+                if not (len(names) == len(embs) == len(scores)):
+                    log.warning("学习历史数据长度不一致，跳过加载。")
+                    self._learn_history = []
+                    return
                 self._learn_history = [
                     (str(n), np.asarray(v, dtype=np.float32), float(s))
-                    for n, v, s in zip(data["names"], data["embeddings"], data["scores"])
+                    for n, v, s in zip(names, embs, scores)
                 ]
                 log.info("已加载 %d 条学习历史", len(self._learn_history))
             except Exception as e:
@@ -161,17 +190,23 @@ class Recognizer:
 
     def _save_learn_history(self) -> None:
         """保存学习历史。"""
-        if not self._learn_history:
-            LEARN_DB.unlink(missing_ok=True)
-            return
-        names = [n for n, _, _ in self._learn_history]
-        embs = [e for _, e, _ in self._learn_history]
-        scores = [s for _, _, s in self._learn_history]
+        import os
         try:
-            np.savez(str(LEARN_DB),
+            if not self._learn_history:
+                try:
+                    LEARN_DB.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                return
+            names = [n for n, _, _ in self._learn_history]
+            embs = [e for _, e, _ in self._learn_history]
+            scores = [s for _, _, s in self._learn_history]
+            tmp = str(LEARN_DB) + ".tmp"
+            np.savez(tmp,
                      names=np.array(names, dtype=object),
-                     embeddings=np.array(embs, dtype=np.float32),
+                     embeddings=np.array(embs, dtype=object),
                      scores=np.array(scores, dtype=np.float32))
+            os.replace(tmp, str(LEARN_DB))
         except Exception as e:
             log.warning("学习历史保存失败: %s", e)
 
@@ -233,15 +268,16 @@ class Recognizer:
             adjustment = (avg_score - self.threshold) * 0.3
             self._dynamic_threshold = max(0.3, min(0.8, self.threshold + adjustment))
 
-        log.info(f"自适应学习: {name} 新增样本 (历史 {len(user_samples)} 个, 阈值 {self._dynamic_threshold:.3f})")
+        actual_count = sum(1 for n, _, _ in self._learn_history if n == name)
+        log.info(f"自适应学习: {name} 新增样本 (历史 {actual_count} 个, 阈值 {self._dynamic_threshold:.3f})")
         return True
 
     def _update_fused_embedding(self, name: str) -> None:
         """融合该用户的所有特征（原始 + 学习历史）为平均向量。"""
         all_embs = []
-        # 原始注册特征
+        # 原始注册特征：精确匹配 name 或 name_数字 后缀
         for n, e in self._db:
-            if n == name or n.startswith(f"{name}_"):
+            if n == name or (n.startswith(f"{name}_") and n[len(name)+1:].isdigit()):
                 all_embs.append(e)
         # 学习历史
         for n, e, _ in self._learn_history:
@@ -281,26 +317,39 @@ class Recognizer:
     def _extract_feature_dnn(self, frame: np.ndarray, face: Face) -> np.ndarray | None:
         """用 cv2.dnn (MobileFaceNet/ArcFace) 提取特征。"""
         try:
-            # 裁剪人脸区域
-            x1 = max(0, face.x)
-            y1 = max(0, face.y)
-            x2 = min(frame.shape[1], face.x + face.w)
-            y2 = min(frame.shape[0], face.y + face.h)
-            if x2 - x1 < 32 or y2 - y1 < 32:
-                return None
-            face_img = frame[y1:y2, x1:x2]
-            # resize 到 112x112 (ArcFace/MobileFaceNet 标准输入)
-            face_img = cv2.resize(face_img, (112, 112))
-            # 预处理：BGR -> RGB, 归一化
-            face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
+            h, w = frame.shape[:2]
+            # 用 5 landmark 做仿射对齐（标准 ArcFace 对齐目标点，112x112）
+            lm = face.landmarks
+            src = np.array([
+                lm.get("left_eye", (0, 0)),
+                lm.get("right_eye", (0, 0)),
+                lm.get("nose", (0, 0)),
+                lm.get("right_mouth", (0, 0)),
+                lm.get("left_mouth", (0, 0)),
+            ], dtype=np.float32)
+            # 标准对齐目标（112x112，ArcFace 标准）
+            dst = np.array([
+                [38.2946, 51.6963], [73.5318, 51.5014],
+                [56.0252, 71.7366], [41.5493, 92.3655], [70.7299, 92.2041]
+            ], dtype=np.float32)
+            M, _ = cv2.estimateAffinePartial2D(src, dst)
+            if M is None:
+                # 对齐失败，回退到简单裁剪
+                x1, y1 = max(0, face.x), max(0, face.y)
+                x2, y2 = min(w, face.x + face.w), min(h, face.y + face.h)
+                if x2 - x1 < 32 or y2 - y1 < 32:
+                    return None
+                face_img = frame[y1:y2, x1:x2]
+                face_img = cv2.resize(face_img, (112, 112))
+            else:
+                face_img = cv2.warpAffine(frame, M, (112, 112), borderValue=0)
+            # 保持 BGR（OpenCV zoo 模型训练时为 BGR），归一化
             face_img = (face_img.astype(np.float32) - 127.5) / 127.5
             # HWC -> CHW
             face_img = np.transpose(face_img, (2, 0, 1))
             face_img = np.expand_dims(face_img, axis=0)
-
             self.recognizer.setInput(face_img)
             emb = self.recognizer.forward()
-            # L2 归一化
             emb = emb.flatten()
             norm = np.linalg.norm(emb) + 1e-8
             return emb / norm
@@ -312,31 +361,35 @@ class Recognizer:
         """检测画面中所有人脸。"""
         if self.detector is None:
             return []
-        h, w = frame.shape[:2]
-        self.detector.setInputSize((w, h))
-        _, faces = self.detector.detect(frame)
-        results: list[Face] = []
-        if faces is None:
+        try:
+            h, w = frame.shape[:2]
+            self.detector.setInputSize((w, h))
+            _, faces = self.detector.detect(frame)
+            results: list[Face] = []
+            if faces is None:
+                return results
+            for f in faces:
+                x, y, fw, fh = int(f[0]), int(f[1]), int(f[2]), int(f[3])
+                lm = {
+                    "right_eye": (int(f[4]), int(f[5])),
+                    "left_eye": (int(f[6]), int(f[7])),
+                    "nose": (int(f[8]), int(f[9])),
+                    "right_mouth": (int(f[10]), int(f[11])),
+                    "left_mouth": (int(f[12]), int(f[13])),
+                }
+                area_ratio = (fw * fh) / float(w * h)
+                emb = None
+                if self.recognizer is not None:
+                    if self._rec_type == "opencv_sf":
+                        emb = self._extract_feature_sface(frame, f)
+                    else:
+                        face_obj = Face(x, y, fw, fh, lm, area_ratio, None)
+                        emb = self._extract_feature_dnn(frame, face_obj)
+                results.append(Face(x, y, fw, fh, lm, area_ratio, emb))
             return results
-        for f in faces:
-            x, y, fw, fh = int(f[0]), int(f[1]), int(f[2]), int(f[3])
-            lm = {
-                "right_eye": (int(f[4]), int(f[5])),
-                "left_eye": (int(f[6]), int(f[7])),
-                "nose": (int(f[8]), int(f[9])),
-                "right_mouth": (int(f[10]), int(f[11])),
-                "left_mouth": (int(f[12]), int(f[13])),
-            }
-            area_ratio = (fw * fh) / float(w * h)
-            emb = None
-            if self.recognizer is not None:
-                if self._rec_type == "opencv_sf":
-                    emb = self._extract_feature_sface(frame, f)
-                else:
-                    face_obj = Face(x, y, fw, fh, lm, area_ratio, None)
-                    emb = self._extract_feature_dnn(frame, face_obj)
-            results.append(Face(x, y, fw, fh, lm, area_ratio, emb))
-        return results
+        except Exception as e:
+            log.warning("检测异常: %s", e)
+            return []
 
     def _cosine_similarity(self, a: np.ndarray, b: np.ndarray) -> float:
         """计算余弦相似度。"""
@@ -359,9 +412,13 @@ class Recognizer:
                 continue
             if score > best_score:
                 best_score, best_name = score, name
-        # 如果匹配到的是 _fused 条目，去掉后缀返回原始名字
-        if best_name and best_name.endswith("_fused"):
-            best_name = best_name[:-6]
+        # 剥离后缀：_fused 和 _数字
+        if best_name:
+            if best_name.endswith("_fused"):
+                best_name = best_name[:-6]
+            else:
+                import re
+                best_name = re.sub(r'_\d+$', '', best_name)
         return best_name, best_score
 
     def confirm_owner(self, embedding: np.ndarray) -> tuple[str | None, float]:
@@ -372,14 +429,15 @@ class Recognizer:
         成功确认后触发自适应学习。
         """
         name, score = self.match(embedding)
-        # 使用动态阈值
         hit = score >= self._dynamic_threshold and name is not None
-        self._hits.append(hit)
-        # 取最近 confirm_frames 帧，必须全部命中
+        # 存 name（命中）或 None（未命中）
+        self._hits.append(name if hit else None)
         recent = list(self._hits)[-self.confirm_frames:]
-        confirmed = len(recent) >= self.confirm_frames and all(recent)
+        # 最近 confirm_frames 帧都必须命中且是同一个人
+        confirmed = (len(recent) >= self.confirm_frames
+                     and all(r is not None for r in recent)
+                     and len(set(recent)) == 1)
         if confirmed and hit:
-            # 触发自适应学习
             self.learn_from_success(name, embedding, score)
             return name, score
         return None, score
@@ -392,10 +450,15 @@ class Recognizer:
         if self.recognizer is None:
             return None
         if self._rec_type == "opencv_sf":
+            lm = face.landmarks
+            lm_keys = ("right_eye", "left_eye", "nose", "right_mouth", "left_mouth")
+            # 如果所有 landmark 都缺失，回退到 dnn 分支
+            if all(k not in lm for k in lm_keys):
+                return self._extract_feature_dnn(frame, face)
             arr = np.array([face.x, face.y, face.w, face.h,
-                            *face.landmarks["right_eye"], *face.landmarks["left_eye"],
-                            *face.landmarks["nose"], *face.landmarks["right_mouth"],
-                            *face.landmarks["left_mouth"]], dtype=np.float32)
+                            *lm.get("right_eye", (0, 0)), *lm.get("left_eye", (0, 0)),
+                            *lm.get("nose", (0, 0)), *lm.get("right_mouth", (0, 0)),
+                            *lm.get("left_mouth", (0, 0))], dtype=np.float32)
             return self._extract_feature_sface(frame, arr)
         else:
             return self._extract_feature_dnn(frame, face)

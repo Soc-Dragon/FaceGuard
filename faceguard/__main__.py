@@ -114,63 +114,73 @@ def _alert_dialog(title: str, message: str, icon: str = "warning") -> None:
         print(f"[{title}] {message}")
 
 
-def run_guard(cfg: dict) -> None:
-    """主守护循环。"""
+def run_guard(cfg: dict, silent: bool = False) -> int:
+    """主守护循环。返回退出码：0=正常, 1=摄像头错误, 2=模型错误, 3=未注册。"""
     rcfg = cfg["recognizer"]
+    # silent 模式：关闭 overlay、降低日志、不弹对话框
+    if silent:
+        cfg.setdefault("overlay", {})["enabled"] = False
+        if cfg.get("log", {}).get("level", "INFO").upper() == "INFO":
+            cfg["log"]["level"] = "WARNING"
+
     cam = Camera(rcfg.get("camera_index", 0),
                  rcfg.get("frame_width", 640),
                  rcfg.get("frame_height", 480),
                  rcfg.get("fps", 15))
     if not cam.open():
         log.error("摄像头打开失败，5 秒后重试...")
-        _alert_dialog(
-            "FaceGuard · 摄像头错误",
-            "无法打开摄像头（序号 %s）。\n\n"
-            "请检查：\n"
-            "1. 摄像头是否被其他程序占用\n"
-            "2. 摄像头是否已连接\n"
-            "3. 在「设置」中更换摄像头序号" % rcfg.get("camera_index", 0),
-            "error",
-        )
-        return
+        if not silent:
+            _alert_dialog(
+                "FaceGuard · 摄像头错误",
+                "无法打开摄像头（序号 %s）。\n\n"
+                "请检查：\n"
+                "1. 摄像头是否被其他程序占用\n"
+                "2. 摄像头是否已连接\n"
+                "3. 在「设置」中更换摄像头序号" % rcfg.get("camera_index", 0),
+                "error",
+            )
+        return 1
 
     rec = Recognizer(cfg)
     if not rec.init_models():
         log.error("模型初始化失败。")
         cam.release()
-        _alert_dialog(
-            "FaceGuard · 模型加载失败",
-            "人脸识别模型加载失败。\n\n"
-            "可能原因：\n"
-            "1. 首次运行需联网下载模型\n"
-            "2. 模型文件损坏\n\n"
-            "请检查网络后重试，或重新安装。",
-            "error",
-        )
-        return
+        if not silent:
+            _alert_dialog(
+                "FaceGuard · 模型加载失败",
+                "人脸识别模型加载失败。\n\n"
+                "可能原因：\n"
+                "1. 首次运行需联网下载模型\n"
+                "2. 模型文件损坏\n\n"
+                "请检查网络后重试，或重新安装。",
+                "error",
+            )
+        return 2
 
     if not rec.has_enrolled():
         log.warning("尚未注册任何人脸！请先运行 --enroll 完成注册。")
         cam.release()
-        # 询问是否立即注册
-        try:
-            import tkinter as tk
-            from tkinter import messagebox
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes("-topmost", True)
-            ans = messagebox.askyesno(
-                "FaceGuard · 尚未注册人脸",
-                "尚未注册任何人脸，守护无法启动。\n\n"
-                "是否立即注册本人人脸？",
-                parent=root,
-            )
-            root.destroy()
-            if ans:
-                enroll_interactive(cfg)
-        except Exception as e:
-            log.error("无法启动注册引导: %s", e)
-        return
+        if not silent:
+            # 询问是否立即注册，注册成功后重启守护
+            try:
+                import tkinter as tk
+                from tkinter import messagebox
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes("-topmost", True)
+                ans = messagebox.askyesno(
+                    "FaceGuard · 尚未注册人脸",
+                    "尚未注册任何人脸，守护无法启动。\n\n"
+                    "是否立即注册本人人脸？",
+                    parent=root,
+                )
+                root.destroy()
+                if ans and enroll_interactive(cfg):
+                    # 注册成功，递归重启守护
+                    return run_guard(cfg, silent)
+            except Exception as e:
+                log.error("无法启动注册引导: %s", e)
+        return 3
 
     guardian = Guardian(cfg)
     presence = Presence(cfg)
@@ -250,6 +260,7 @@ def run_guard(cfg: dict) -> None:
         overlay.stop()
         cam.release()
         log.info("FaceGuard 守护已停止。")
+    return 0
 
 
 def config_ui(cfg: dict) -> None:
@@ -475,16 +486,16 @@ def main(argv: list[str] | None = None) -> int:
 
     # 默认：启动守护
     try:
-        run_guard(cfg)
+        return run_guard(cfg, silent=args.silent)
     except Exception as e:
         log.exception("守护异常退出")
-        _alert_dialog(
-            "FaceGuard · 异常退出",
-            f"程序遇到错误：\n{e}\n\n请截图此错误并反馈。",
-            "error",
-        )
+        if not args.silent:
+            _alert_dialog(
+                "FaceGuard · 异常退出",
+                f"程序遇到错误：\n{e}\n\n请截图此错误并反馈。",
+                "error",
+            )
         return 1
-    return 0
 
 
 if __name__ == "__main__":

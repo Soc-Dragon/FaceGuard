@@ -47,7 +47,10 @@ def _face_mesh_points(face) -> list[tuple[float, float]]:
     所有点基于 landmarks 实时计算，随人脸变动而跟随。
     """
     pts: list[tuple[float, float]] = []
-    lm = face.landmarks
+    REQUIRED = ("left_eye", "right_eye", "nose", "right_mouth", "left_mouth")
+    lm = face.landmarks or {}
+    if not all(k in lm for k in REQUIRED):
+        return []  # landmarks 不全，不画点阵
     le = lm["left_eye"]
     re = lm["right_eye"]
     nose = lm["nose"]
@@ -89,10 +92,6 @@ def _face_mesh_points(face) -> list[tuple[float, float]]:
 
     # 4. 眉毛（眼睛上方弧线）
     brow_offset = eye_dist * 0.22
-    brow_rx = eye_dist * 0.22
-    for t in range(-5, 6):
-        x = face_cx + (le[0] - re[0]) * 0.5 * t / 5  # 沿眼连线方向
-        # 简化：在每只眼上方画弧
     for eye in (le, re):
         for t in range(-4, 5):
             x = eye[0] + t * eye_dist * 0.05
@@ -148,12 +147,21 @@ def _draw_laser_dot(frame, x: float, y: float, color=COLOR_LASER,
 def _draw_laser_mesh(frame, face, color=COLOR_LASER, t: float | None = None) -> None:
     """绘制蓝色激光点阵（面部轮廓 + 五官）。"""
     pts = _face_mesh_points(face)
-    # 微动：点阵随时间轻微脉动，模拟激光扫描的呼吸感
     t = t if t is not None else time.time()
     pulse = 0.85 + 0.15 * (math.sin(t * 3) * 0.5 + 0.5)
+    H, W = frame.shape[:2]
+    # 单次 overlay 做所有光晕
+    overlay = frame.copy()
     for (x, y) in pts:
-        _draw_laser_dot(frame, x, y, color, core_r=1, glow_r=5,
-                        glow_alpha=0.30 * pulse)
+        xi, yi = int(x), int(y)
+        if -5 <= xi < W + 5 and -5 <= yi < H + 5:
+            cv2.circle(overlay, (xi, yi), 5, color, -1, cv2.LINE_AA)
+    cv2.addWeighted(overlay, 0.30 * pulse, frame, 1 - 0.30 * pulse, 0, frame)
+    # 核心白点直接画
+    for (x, y) in pts:
+        xi, yi = int(x), int(y)
+        if -5 <= xi < W + 5 and -5 <= yi < H + 5:
+            cv2.circle(frame, (xi, yi), 1, COLOR_LASER_CORE, -1, cv2.LINE_AA)
 
 
 # ---------- 简洁 UI 组件 ----------
@@ -236,14 +244,18 @@ def _draw_status_bar(frame, status: str, color) -> None:
 def render_overlay(frame, faces, owner_name, confidence, status: str,
                    cfg: dict, t: float | None = None) -> np.ndarray:
     """简洁风格主渲染：蓝色激光点阵 + 细线人脸框 + 状态栏。"""
+    if frame is None:
+        return frame
     t = t if t is not None else time.time()
     ocfg = cfg.get("overlay", {})
     show_scan = ocfg.get("show_scanline", True)
     show_conf = ocfg.get("show_confidence", True)
 
     top_color = COLOR_OWNER  # 默认蓝
-    for face in faces:
-        is_owner = owner_name is not None
+    # 找最大脸索引
+    biggest_idx = max(range(len(faces)), key=lambda i: faces[i].area_ratio) if faces else -1
+    for idx, face in enumerate(faces):
+        is_owner = (idx == biggest_idx) and owner_name is not None
         color = COLOR_OWNER if is_owner else COLOR_STRANGER
         label = owner_name if is_owner else "Unknown"
 

@@ -80,9 +80,9 @@ DEFAULTS = {
         "smtp_host": "smtp.qq.com",
         "smtp_port": 465,
         "smtp_ssl": True,
-        "sender": "1247053973@qq.com",
+        "sender": "",
         "password": "",                # QQ 邮箱授权码，非登录密码
-        "to": "1247053973@qq.com",
+        "to": "",
         "cooldown_seconds": 60,        # 同一告警冷却，避免刷屏
     },
     # 身后入侵守护
@@ -126,13 +126,26 @@ DEFAULTS = {
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
-    """递归合并：override 覆盖 base。"""
+    """递归合并：override 覆盖 base，数值做类型校验。"""
     out = deepcopy(base)
     for k, v in (override or {}).items():
         if isinstance(v, dict) and isinstance(out.get(k), dict):
             out[k] = _deep_merge(out[k], v)
         else:
-            out[k] = v
+            # 类型校验：如果默认值是数值，强制转换 override
+            default_val = out.get(k)
+            if isinstance(default_val, (int, float)) and not isinstance(default_val, bool):
+                if isinstance(v, bool):
+                    out[k] = default_val  # bool 不覆盖数值
+                elif isinstance(v, (int, float)):
+                    out[k] = v
+                else:
+                    try:
+                        out[k] = type(default_val)(v)
+                    except (TypeError, ValueError):
+                        out[k] = default_val
+            else:
+                out[k] = v
     return out
 
 
@@ -141,19 +154,32 @@ def load_config() -> dict:
     cfg = deepcopy(DEFAULTS)
     if CONFIG_PATH.exists():
         try:
-            raw = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-            cfg = _deep_merge(cfg, raw)
-        except (json.JSONDecodeError, OSError):
-            pass
+            raw = CONFIG_PATH.read_text(encoding="utf-8")
+            cfg = _deep_merge(cfg, json.loads(raw))
+        except (json.JSONDecodeError, OSError) as e:
+            # 备份损坏的配置
+            try:
+                import shutil
+                bak = CONFIG_PATH.with_suffix(".json.bak.corrupt")
+                shutil.copy2(CONFIG_PATH, bak)
+            except OSError:
+                pass
+            # 用 print 而非 log（logging 可能未初始化）
+            print(f"[FaceGuard] 配置文件损坏，使用默认值: {e}", flush=True)
     cfg.setdefault("version", DEFAULTS["version"])
     return cfg
 
 
-def save_config(cfg: dict) -> None:
-    """保存配置到磁盘。"""
-    CONFIG_PATH.write_text(
-        json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+def save_config(cfg: dict) -> bool:
+    """保存配置到磁盘，返回是否成功。"""
+    try:
+        CONFIG_PATH.write_text(
+            json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        return True
+    except (OSError, PermissionError) as e:
+        print(f"[FaceGuard] 配置保存失败: {e}", flush=True)
+        return False
 
 
 def ensure_example_config(path: Path) -> None:

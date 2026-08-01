@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import smtplib
 import ssl
+import threading
 import time
 from datetime import datetime
 from email.message import EmailMessage
@@ -29,10 +30,10 @@ def save_capture(frame, prefix: str = "intruder") -> Path | None:
         # 防御：空数组会让 cv2 抛 assertion 并刷错误日志
         if not hasattr(frame, "size") or frame.size == 0:
             return None
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         path = CAPTURE_DIR / f"{prefix}_{ts}.jpg"
-        cv2.imwrite(str(path), frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-        return path
+        ok = cv2.imwrite(str(path), frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        return path if ok and path.exists() else None
     except Exception as e:
         log.error("保存抓拍失败: %s", e)
         return None
@@ -62,10 +63,10 @@ def send_alert(
     use_ssl = ncfg.get("smtp_ssl", True)
     sender = ncfg.get("sender", "")
     password = ncfg.get("password", "")
-    to = ncfg.get("to", sender)
+    to = ncfg.get("to") or sender
 
-    if not sender or not password:
-        log.warning("未配置邮箱授权码，跳过发送。")
+    if not sender or not password or not to:
+        log.warning("未配置邮箱或收件人，跳过发送。")
         return False
 
     msg = EmailMessage()
@@ -102,20 +103,22 @@ def send_alert(
 def alert_recognition_failed(frame, cfg: dict) -> None:
     """识别失败：保存抓拍 + 发邮件。"""
     cap = save_capture(frame, prefix="failed_unlock")
-    send_alert(
-        "人脸识别失败告警",
-        "检测到陌生人在尝试通过人脸解锁，已抓拍现场照片，请查看附件。",
-        attachment=cap,
-        cfg=cfg,
-    )
+    threading.Thread(
+        target=send_alert,
+        args=("人脸识别失败告警",
+              "检测到陌生人在尝试通过人脸解锁，已抓拍现场照片，请查看附件。"),
+        kwargs={"attachment": cap, "cfg": cfg},
+        daemon=True
+    ).start()
 
 
 def alert_intruder(frame, cfg: dict) -> None:
     """身后出现他人：保存抓拍 + 发邮件。"""
     cap = save_capture(frame, prefix="intruder_behind")
-    send_alert(
-        "身后出现他人提醒",
-        "检测到你身后出现其他人脸，已抓拍现场照片，请查看附件。",
-        attachment=cap,
-        cfg=cfg,
-    )
+    threading.Thread(
+        target=send_alert,
+        args=("身后出现他人提醒",
+              "检测到你身后出现其他人脸，已抓拍现场照片，请查看附件。"),
+        kwargs={"attachment": cap, "cfg": cfg},
+        daemon=True
+    ).start()

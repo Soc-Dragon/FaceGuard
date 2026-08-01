@@ -3,7 +3,7 @@
 ; 命令行编译：iscc.exe release\FaceGuard.iss
 
 #define MyAppName "FaceGuard"
-#define MyAppVersion "2.1.0"
+#define MyAppVersion "2.2.0"
 #define MyAppPublisher "Soc-Dragon"
 #define MyAppExeName "FaceGuard.exe"
 #define MyAppURL "https://github.com/Soc-Dragon/FaceGuard"
@@ -42,6 +42,8 @@ Source: "..\dist\FaceGuard.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; 配置示例与文档
 Source: "..\config.example.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README_使用指南.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "install.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "uninstall.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\FaceGuard"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--silent"

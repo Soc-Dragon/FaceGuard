@@ -28,6 +28,19 @@ class Guardian:
         if not self.enabled:
             return None
         valid = [f for f in faces if f.area_ratio >= self.min_area]
+        # 如果有主人，排除最大脸（主人），只对剩余脸计数
+        if owner_name:
+            # 主人是最大脸，排除它
+            if valid:
+                valid_sorted = sorted(valid, key=lambda f: f.area_ratio, reverse=True)
+                intruder_faces = valid_sorted[1:]
+            else:
+                intruder_faces = []
+        else:
+            intruder_faces = valid
+
+        if len(intruder_faces) == 0:
+            return None
         if len(valid) <= 1:
             return None
 
@@ -37,9 +50,7 @@ class Guardian:
             return "intruder"
 
         # 过了节流期，真正触发一次告警
-        valid.sort(key=lambda f: f.area_ratio, reverse=True)
-        intruders = valid[1:]
-        log.warning("检测到身后出现 %d 个他人！", len(intruders))
+        log.warning("检测到身后出现 %d 个他人！", len(intruder_faces))
         if self.sound:
             _beep()
         notifier.alert_intruder(frame, cfg)

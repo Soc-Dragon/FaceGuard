@@ -30,6 +30,14 @@ MODEL_URLS = {
         "https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx",
         "https://raw.githubusercontent.com/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx",
     ],
+    "face_recognition_mobilefacenet.onnx": [
+        "https://github.com/onnx/models/raw/main/validated/vision/body_analysis/arcface/model/mobilefacenet-9c9db7fc.onnx",
+        "https://raw.githubusercontent.com/onnx/models/main/validated/vision/body_analysis/arcface/model/mobilefacenet-9c9db7fc.onnx",
+    ],
+    "face_recognition_arcface.onnx": [
+        "https://github.com/onnx/models/raw/main/validated/vision/body_analysis/arcface/model/resnet50-face-featurizer-v1.onnx",
+        "https://raw.githubusercontent.com/onnx/models/main/validated/vision/body_analysis/arcface/model/resnet50-face-featurizer-v1.onnx",
+    ],
 }
 
 
@@ -101,6 +109,9 @@ def build() -> int:
         "--windowed",
         "--name", "FaceGuard",
         "--collect-all", "cv2",
+        "--collect-all", "numpy",
+        "--collect-all", "PIL",
+        "--hidden-import", "PIL.ImageTk",
     ] + add_data_args + [
         str(ENTRY),
     ]

@@ -12,17 +12,46 @@ from copy import deepcopy
 from pathlib import Path
 
 # 运行期数据目录：C:\\Users\\<u>\\AppData\\Roaming\\FaceGuard
-APP_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "FaceGuard"
-APP_DIR.mkdir(parents=True, exist_ok=True)
+# 防御: APPDATA 异常时兜底到用户主目录
+def _resolve_app_dir() -> Path:
+    candidates = []
+    appdata = os.environ.get("APPDATA", "").strip()
+    if appdata:
+        candidates.append(Path(appdata))
+    # Windows 备用: LOCALAPPDATA
+    localappdata = os.environ.get("LOCALAPPDATA", "").strip()
+    if localappdata:
+        candidates.append(Path(localappdata))
+    # 兜底: 用户主目录
+    candidates.append(Path.home() / ".faceguard")
+
+    for base in candidates:
+        try:
+            if not base or str(base) in ("", "."):
+                continue
+            d = base / "FaceGuard"
+            d.mkdir(parents=True, exist_ok=True)
+            if d.exists():
+                return d
+        except (OSError, PermissionError, ValueError):
+            continue
+    # 最后兜底: 当前工作目录
+    return Path.cwd() / "FaceGuard"
+
+
+APP_DIR = _resolve_app_dir()
 
 CONFIG_PATH = APP_DIR / "config.json"
 DATA_DIR = APP_DIR / "data"
 MODELS_DIR = APP_DIR / "models"
 LOG_DIR = APP_DIR / "logs"
-CAPTURE_DIR = APP_DIR / "captures"  # 识别失败时保存的人脸照片
+CAPTURE_DIR = APP_DIR / "captures"
 
 for _d in (DATA_DIR, MODELS_DIR, LOG_DIR, CAPTURE_DIR):
-    _d.mkdir(parents=True, exist_ok=True)
+    try:
+        _d.mkdir(parents=True, exist_ok=True)
+    except (OSError, PermissionError):
+        pass
 
 # 默认配置 —— 所有数字均可在设置中由用户自行调整
 DEFAULTS = {

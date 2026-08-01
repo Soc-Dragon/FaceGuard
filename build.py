@@ -1,7 +1,6 @@
 """FaceGuard 构建脚本：用 PyInstaller 打包成单文件 exe。
 
-本地构建：python build.py
-GitHub Actions 也会调用本脚本。
+自动下载模型 → 打包到 exe → 用户安装后无需联网即可使用。
 """
 
 from __future__ import annotations
@@ -16,22 +15,93 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).parent
-ENTRY = ROOT / "run.py"   # 顶层入口，避免包内相对导入失败
+ENTRY = ROOT / "run.py"
 DIST = ROOT / "dist"
 BUILD = ROOT / "build"
+BUNDLE_DIR = ROOT / "models_bundle"
+
+# 模型下载地址（与 models.py 保持一致）
+MODEL_URLS = {
+    "face_detection_yunet_2023mar.onnx": [
+        "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+        "https://raw.githubusercontent.com/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+    ],
+    "face_recognition_sface_2021dec.onnx": [
+        "https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx",
+        "https://raw.githubusercontent.com/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx",
+    ],
+}
+
+
+def download_models() -> bool:
+    """下载模型到 models_bundle/，返回是否全部成功。"""
+    import urllib.request
+    import urllib.error
+
+    BUNDLE_DIR.mkdir(parents=True, exist_ok=True)
+    all_ok = True
+
+    for fname, urls in MODEL_URLS.items():
+        dest = BUNDLE_DIR / fname
+        if dest.exists() and dest.stat().st_size > 1000:
+            print(f"[build] {fname} 已存在，跳过下载")
+            continue
+
+        ok = False
+        for url in urls:
+            print(f"[build] 下载 {fname} from {url[:80]}...")
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "FaceGuard/2.1"})
+                resp = urllib.request.urlopen(req, timeout=120)
+                data = resp.read()
+                if len(data) > 0:
+                    dest.write_bytes(data)
+                    print(f"[build] {fname} 下载成功 ({len(data) // 1024} KB)")
+                    ok = True
+                    break
+            except Exception as e:
+                print(f"[build] 下载失败: {e}")
+                try:
+                    dest.unlink()
+                except OSError:
+                    pass
+
+        if not ok:
+            print(f"[build] !!! {fname} 全部下载失败")
+            all_ok = False
+
+    return all_ok
 
 
 def build() -> int:
+    # 先下载模型
+    models_ok = download_models()
+    if not models_ok:
+        print("[build] 警告: 部分模型下载失败，打包的 exe 将需要首次联网下载模型。")
+        print("[build] 继续打包...")
+
+    # 构造 --add-data 参数：把 models_bundle 下的所有模型打包进去
+    add_data_args = []
+    if BUNDLE_DIR.exists():
+        for model_file in BUNDLE_DIR.iterdir():
+            if model_file.is_file():
+                # Windows 用 ; 分隔源和目标，Linux 用 :
+                sep = ";" if sys.platform == "win32" else ":"
+                add_data_args.extend([
+                    "--add-data",
+                    f"{model_file}{sep}models"
+                ])
+                print(f"[build] 打包模型: {model_file.name}")
+
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--noconfirm",
         "--clean",
         "--onefile",
-        "--windowed",                       # 无控制台窗口（GUI/守护）
+        "--windowed",
         "--name", "FaceGuard",
-        "--collect-all", "cv2",             # OpenCV 数据文件
-        # 图标（如有）
-        # "--icon", str(ROOT / "release" / "faceguard.ico"),
+        "--collect-all", "cv2",
+    ] + add_data_args + [
         str(ENTRY),
     ]
     print("[build] 运行:", " ".join(cmd))

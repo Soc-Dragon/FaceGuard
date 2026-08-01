@@ -1,12 +1,15 @@
-"""液态玻璃（Liquid Glass）风格识别画面可视化。
+"""简洁风格人脸可视化：蓝色激光点阵描绘面部轮廓与五官。
 
-苹果 Liquid Glass 视觉要素：
-  - 毛玻璃模糊背景层
-  - 流光渐变边框（动态色相旋转）
-  - 圆角玻璃面板
-  - 折射高光（顶部亮、底部暗）
-  - 呼吸光晕
-  - 扫描线带柔光
+设计：
+  · 极简 UI：细线状态栏 + 简洁文字，无花哨玻璃/光晕/粒子
+  · 蓝色激光点阵：基于 5 个 landmarks + 人脸框插值生成密集点阵
+    - 面部外轮廓（椭圆点阵）
+    - 左右眼轮廓（椭圆点阵）
+    - 鼻梁（竖线点阵）
+    - 嘴唇（椭圆点阵）
+    - 眉毛（弧线点阵）
+  · 激光质感：中心亮白点 + 外圈蓝色光晕（alpha 叠加）
+  · 实时跟随：所有点基于 face.landmarks 动态计算，随人脸变动
 全部用 OpenCV 绘制，无外部资源。
 """
 
@@ -19,237 +22,247 @@ import cv2
 import numpy as np
 
 
-# ---------- 液态玻璃配色（BGR，Apple 系统色 2025）----------
-# Apple Liquid Glass palette: mint #30D58C · coral #FF453A · amber #FF9F0A · blue #0A84FF · purple #BF5AF2
-COLOR_OWNER = (140, 213, 48)        # 本人 - Apple 薄荷 #30D58C
-COLOR_OWNER_LT = (181, 234, 94)     # 薄荷亮 #5EEAB5
-COLOR_STRANGER = (58, 69, 255)      # 陌生人 - Apple 珊瑚 #FF453A
-COLOR_STRANGER_LT = (122, 129, 255) # 珊瑚亮 #FF817A
-COLOR_INTRUDER = (10, 159, 255)     # 入侵 - Apple 琥珀 #FF9F0A
-COLOR_INTRUDER_LT = (71, 191, 255)  # 琥珀亮 #FFBF47
-COLOR_INFO = (255, 132, 10)         # 信息 - Apple 蓝 #0A84FF
-COLOR_PURPLE = (242, 90, 191)       # 模型 - Apple 紫 #BF5AF2
-COLOR_GLASS_EDGE = (255, 255, 255)  # 玻璃边 - 白
-COLOR_HIGHLIGHT = (255, 255, 255)   # 高光
-COLOR_TEXT = (245, 245, 247)        # Apple 白 #F5F5F7
-COLOR_TEXT_SHADOW = (0, 0, 0)
+# ---------- 简洁配色（BGR）----------
+COLOR_LASER = (255, 140, 0)        # 激光蓝 #008CFF
+COLOR_LASER_CORE = (255, 255, 255)  # 激光核心白
+COLOR_LASER_DIM = (180, 80, 0)     # 激光蓝暗
+COLOR_OWNER = (255, 140, 0)        # 本人 - 蓝
+COLOR_STRANGER = (80, 80, 255)     # 陌生人 - 红
+COLOR_TEXT = (245, 245, 247)       # Apple 白
+COLOR_TEXT_DIM = (160, 160, 170)   # 副文字
+COLOR_BG_BAR = (10, 10, 14)        # 状态栏底
 
 
-# ---------- 工具 ----------
+# ---------- 激光点阵生成 ----------
 
-def _rounded_rect_mask(size: tuple[int, int], radius: int) -> np.ndarray:
-    """生成圆角矩形 mask（白=有效，黑=透明）。"""
-    w, h = size
-    mask = np.zeros((h, w), dtype=np.uint8)
-    cv2.rectangle(mask, (radius, 0), (w - radius, h), 255, -1)
-    cv2.rectangle(mask, (0, radius), (w, h - radius), 255, -1)
-    cv2.circle(mask, (radius, radius), radius, 255, -1)
-    cv2.circle(mask, (w - radius, radius), radius, 255, -1)
-    cv2.circle(mask, (radius, h - radius), radius, 255, -1)
-    cv2.circle(mask, (w - radius, h - radius), radius, 255, -1)
-    return mask
+def _face_mesh_points(face) -> list[tuple[float, float]]:
+    """基于 5 landmarks + 人脸框，生成面部轮廓与五官的密集点阵。
+
+    点阵区域：
+      1. 面部外轮廓（椭圆，沿人脸框略内收）
+      2. 左右眼轮廓（椭圆）
+      3. 鼻梁（眉心→鼻尖竖线）
+      4. 嘴唇（横向椭圆）
+      5. 眉毛（眼睛上方弧线）
+    所有点基于 landmarks 实时计算，随人脸变动而跟随。
+    """
+    pts: list[tuple[float, float]] = []
+    lm = face.landmarks
+    le = lm["left_eye"]
+    re = lm["right_eye"]
+    nose = lm["nose"]
+    rm = lm["right_mouth"]
+    lm_ = lm["left_mouth"]
+
+    # 瞳距与脸宽参考
+    eye_dx = abs(le[0] - re[0])
+    eye_dy = abs(le[1] - re[1])
+    eye_dist = math.hypot(eye_dx, eye_dy) + 1
+    # 眼睛到嘴的距离（脸长参考）
+    mouth_cx = (rm[0] + lm_[0]) / 2
+    mouth_cy = (rm[1] + lm_[1]) / 2
+    face_cx = (le[0] + re[0]) / 2
+    face_cy = (le[1] + re[1]) / 2
+
+    # 1. 面部外轮廓（椭圆，基于人脸框）
+    rx = face.w * 0.42
+    ry = face.h * 0.48
+    cx = face.x + face.w / 2
+    cy = face.y + face.h / 2 + face.h * 0.02  # 略下移，对齐脸部中心
+    for ang in range(0, 360, 6):
+        a = math.radians(ang)
+        pts.append((cx + rx * math.cos(a), cy + ry * math.sin(a)))
+
+    # 2. 左眼轮廓（椭圆）
+    eye_rx = eye_dist * 0.18
+    eye_ry = eye_dist * 0.12
+    for ang in range(0, 360, 15):
+        a = math.radians(ang)
+        pts.append((le[0] + eye_rx * math.cos(a), le[1] + eye_ry * math.sin(a)))
+    # 3. 右眼轮廓
+    for ang in range(0, 360, 15):
+        a = math.radians(ang)
+        pts.append((re[0] + eye_rx * math.cos(a), re[1] + eye_ry * math.sin(a)))
+    # 瞳孔中心点
+    pts.append((le[0], le[1]))
+    pts.append((re[0], re[1]))
+
+    # 4. 眉毛（眼睛上方弧线）
+    brow_offset = eye_dist * 0.22
+    brow_rx = eye_dist * 0.22
+    for t in range(-5, 6):
+        x = face_cx + (le[0] - re[0]) * 0.5 * t / 5  # 沿眼连线方向
+        # 简化：在每只眼上方画弧
+    for eye in (le, re):
+        for t in range(-4, 5):
+            x = eye[0] + t * eye_dist * 0.05
+            y = eye[1] - brow_offset + abs(t) * eye_dist * 0.015
+            pts.append((x, y))
+
+    # 5. 鼻梁（眉心→鼻尖竖线点阵）
+    brow_center = ((le[0] + re[0]) / 2, (le[1] + re[1]) / 2 - eye_dist * 0.05)
+    for t in range(0, 11):
+        r = t / 10
+        x = brow_center[0] * (1 - r) + nose[0] * r
+        y = brow_center[1] * (1 - r) + nose[1] * r
+        pts.append((x, y))
+    # 鼻翼（鼻尖两侧小点阵）
+    for ang in range(-60, 61, 20):
+        a = math.radians(ang + 90)
+        nw = eye_dist * 0.10
+        pts.append((nose[0] + nw * math.cos(a), nose[1] + nw * math.sin(a)))
+
+    # 6. 嘴唇（横向椭圆点阵）
+    mouth_rx = abs(lm_[0] - rm[0]) / 2 + eye_dist * 0.04
+    mouth_ry = eye_dist * 0.06
+    for ang in range(0, 360, 12):
+        a = math.radians(ang)
+        pts.append((mouth_cx + mouth_rx * math.cos(a), mouth_cy + mouth_ry * math.sin(a)))
+    # 嘴唇中线
+    for t in range(-5, 6):
+        x = mouth_cx + t * mouth_rx * 0.18
+        y = mouth_cy
+        pts.append((x, y))
+
+    return pts
 
 
-def _blend_glass(frame: np.ndarray, roi: np.ndarray, alpha: float = 0.55) -> np.ndarray:
-    """对 ROI 区域做毛玻璃效果：高斯模糊 + 半透明白色叠加。"""
-    blurred = cv2.GaussianBlur(roi, (21, 21), 0)
-    glass = cv2.addWeighted(roi, 1 - alpha, blurred, alpha, 0)
-    # 轻微提亮，模拟玻璃折射
-    glass = cv2.add(glass, np.full_like(glass, 8))
-    return glass
+# ---------- 激光点绘制 ----------
 
-
-def _hue_rotate(base: tuple[int, int, int], t: float) -> tuple[int, int, int]:
-    """随时间在 base 附近做色相微动，模拟流光。"""
-    import colorsys
-    b, g, r = [x / 255.0 for x in base]
-    h, s, v = colorsys.rgb_to_hsv(r, g, b)
-    h = (h + 0.05 * math.sin(t * 0.8)) % 1.0
-    r2, g2, b2 = colorsys.hsv_to_rgb(h, s, v)
-    return (int(b2 * 255), int(g2 * 255), int(r2 * 255))
-
-
-# ---------- 玻璃面板 ----------
-
-def draw_glass_panel(frame, x: int, y: int, w: int, h: int,
-                     color=COLOR_GLASS_EDGE, t: float | None = None) -> None:
-    """绘制一块液态玻璃面板（毛玻璃底 + 圆角 + 流光边 + 高光）。"""
-    t = t if t is not None else time.time()
+def _draw_laser_dot(frame, x: float, y: float, color=COLOR_LASER,
+                    core_r: int = 1, glow_r: int = 5, glow_alpha: float = 0.35) -> None:
+    """绘制单个激光点：中心亮白 + 外圈蓝色光晕。"""
+    xi, yi = int(x), int(y)
     H, W = frame.shape[:2]
-    x1, y1 = max(0, x), max(0, y)
-    x2, y2 = min(W, x + w), min(H, y + h)
-    w2, h2 = x2 - x1, y2 - y1
-    if w2 <= 4 or h2 <= 4:
+    if xi < -glow_r or yi < -glow_r or xi >= W + glow_r or yi >= H + glow_r:
         return
-
-    radius = min(18, w2 // 6, h2 // 6)
-    # 1. 毛玻璃底
-    roi = frame[y1:y2, x1:x2]
-    glass = _blend_glass(frame, roi, alpha=0.6)
-    # 2. 圆角 mask 应用
-    mask = _rounded_rect_mask((w2, h2), radius)
-    mask_3 = cv2.merge([mask, mask, mask])
-    blended = cv2.bitwise_and(glass, mask_3)
-    inv = cv2.bitwise_and(roi, cv2.bitwise_not(mask_3))
-    frame[y1:y2, x1:x2] = cv2.add(blended, inv)
-
-    # 3. 折射高光：顶部 1/3 加白色渐变
-    hl_h = max(2, h2 // 3)
-    hl = np.zeros((hl_h, w2, 3), dtype=np.uint8)
-    for i in range(hl_h):
-        a = int(40 * (1 - i / hl_h))  # 顶部最亮
-        hl[i, :] = [a, a, a]
-    hl_mask = _rounded_rect_mask((w2, hl_h + radius), radius)[:hl_h]
-    hl_mask_3 = cv2.merge([hl_mask, hl_mask, hl_mask])
-    hl_roi = frame[y1:y1 + hl_h, x1:x2]
-    frame[y1:y1 + hl_h, x1:x2] = cv2.add(hl_roi, cv2.bitwise_and(hl, hl_mask_3))
-
-    # 4. 流光边框（圆角描边 + 色相微动）
-    edge_color = _hue_rotate(color, t)
-    overlay = frame.copy()
-    cv2.rectangle(overlay, (x1, y1), (x2, y2), edge_color, 1, cv2.LINE_AA)
-    # 用 mask 做圆角描边
-    edge_mask = np.zeros((h2, w2), dtype=np.uint8)
-    cv2.rectangle(edge_mask, (0, 0), (w2, h2), 255, 1)
-    inner = _rounded_rect_mask((w2, h2), radius)
-    edge_only = cv2.subtract(edge_mask, cv2.erode(inner, np.ones((3, 3), np.uint8)))
-    edge_color_layer = np.full((h2, w2, 3), edge_color, dtype=np.uint8)
-    edge_3 = cv2.bitwise_and(edge_color_layer, cv2.merge([edge_only, edge_only, edge_only]))
-    # 把边框画到 overlay 再混合（柔光感）
-    roi2 = frame[y1:y2, x1:x2]
-    frame[y1:y2, x1:x2] = cv2.add(roi2, edge_3)
+    # 外圈光晕（alpha 叠加）
+    if glow_r > 0:
+        overlay = frame.copy()
+        cv2.circle(overlay, (xi, yi), glow_r, color, -1, cv2.LINE_AA)
+        cv2.addWeighted(overlay, glow_alpha, frame, 1 - glow_alpha, 0, frame)
+    # 中心核心
+    cv2.circle(frame, (xi, yi), core_r, COLOR_LASER_CORE, -1, cv2.LINE_AA)
 
 
-# ---------- 人脸框（液态玻璃风格）----------
-
-def draw_face_glass(frame, face, label: str, color, confidence: float | None = None,
-                    show_conf: bool = True, t: float | None = None) -> None:
-    """液态玻璃风格人脸框：圆角玻璃面板 + 流光边 + 标签胶囊。"""
+def _draw_laser_mesh(frame, face, color=COLOR_LASER, t: float | None = None) -> None:
+    """绘制蓝色激光点阵（面部轮廓 + 五官）。"""
+    pts = _face_mesh_points(face)
+    # 微动：点阵随时间轻微脉动，模拟激光扫描的呼吸感
     t = t if t is not None else time.time()
-    x, y, w, h = face.x, face.y, face.w, face.h
-    # 主体玻璃面板
-    draw_glass_panel(frame, x, y, w, h, color, t)
+    pulse = 0.85 + 0.15 * (math.sin(t * 3) * 0.5 + 0.5)
+    for (x, y) in pts:
+        _draw_laser_dot(frame, x, y, color, core_r=1, glow_r=5,
+                        glow_alpha=0.30 * pulse)
 
-    # 标签胶囊（人脸框上方）
+
+# ---------- 简洁 UI 组件 ----------
+
+def _draw_scan_line(frame, face, t: float) -> None:
+    """简洁扫描线：单条蓝色横线，上下移动。"""
+    progress = (math.sin(t * 1.6) + 1) / 2
+    ly = int(face.y + progress * face.h)
+    cv2.line(frame, (face.x, ly), (face.x + face.w, ly),
+             COLOR_LASER, 1, cv2.LINE_AA)
+    # 微光带
+    overlay = frame.copy()
+    cv2.line(overlay, (face.x, ly), (face.x + face.w, ly),
+             COLOR_LASER, 3, cv2.LINE_AA)
+    cv2.addWeighted(overlay, 0.2, frame, 0.8, 0, frame)
+
+
+def _draw_face_box(frame, face, color, t: float) -> None:
+    """简洁人脸框：细线圆角矩形 + 四角标记。"""
+    x, y, w, h = face.x, face.y, face.w, face.h
+    # 细线矩形
+    cv2.rectangle(frame, (x, y), (x + w, y + h), color, 1, cv2.LINE_AA)
+    # 四角加粗标记
+    cl = max(12, min(w, h) // 6)
+    for (cx, cy, dx, dy) in [
+        (x, y, cl, 0), (x, y, 0, cl),           # 左上
+        (x + w, y, -cl, 0), (x + w, y, 0, cl),  # 右上
+        (x, y + h, cl, 0), (x, y + h, 0, -cl),  # 左下
+        (x + w, y + h, -cl, 0), (x + w, y + h, 0, -cl),  # 右下
+    ]:
+        cv2.line(frame, (cx, cy), (cx + dx, cy + dy), color, 2, cv2.LINE_AA)
+
+
+def _draw_label(frame, face, label: str, color, confidence: float | None) -> None:
+    """简洁标签胶囊：人脸框上方。"""
     text = label
-    if show_conf and confidence is not None:
+    if confidence is not None:
         text += f"  {confidence:.2f}"
     (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-    pad_x, pad_y = 10, 6
-    cap_w, cap_h = tw + pad_x * 2, th + pad_y * 2
-    cap_x = x
-    cap_y = max(0, y - cap_h - 4)
-    # 胶囊也是玻璃面板
-    draw_glass_panel(frame, cap_x, cap_y, cap_w, cap_h, color, t)
-    # 文字 + 阴影
-    cv2.putText(frame, text, (cap_x + pad_x, cap_y + pad_y + th - 1),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_TEXT_SHADOW, 2, cv2.LINE_AA)
-    cv2.putText(frame, text, (cap_x + pad_x, cap_y + pad_y + th - 1),
+    pad_x, pad_y = 8, 5
+    bw, bh = tw + pad_x * 2, th + pad_y * 2
+    bx = face.x
+    by = max(0, face.y - bh - 4)
+    # 半透明黑底
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (bx, by), (bx + bw, by + bh), COLOR_BG_BAR, -1, cv2.LINE_AA)
+    cv2.addWeighted(overlay, 0.65, frame, 0.35, 0, frame)
+    # 左侧色条
+    cv2.rectangle(frame, (bx, by), (bx + 3, by + bh), color, -1, cv2.LINE_AA)
+    # 文字
+    cv2.putText(frame, text, (bx + pad_x, by + pad_y + th - 1),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
 
 
-def draw_landmarks_glass(frame, face, color, t: float | None = None) -> None:
-    """液态关键点：发光圆点 + 连线。"""
-    t = t if t is not None else time.time()
-    glow_color = _hue_rotate(color, t)
-    pts = list(face.landmarks.values())
-    pairs = [("right_eye", "left_eye"), ("left_eye", "nose"),
-             ("nose", "right_mouth"), ("nose", "left_mouth"),
-             ("right_mouth", "left_mouth")]
-    for a, b in pairs:
-        cv2.line(frame, face.landmarks[a], face.landmarks[b], glow_color, 1, cv2.LINE_AA)
-    for p in pts:
-        # 发光：先画大半透明圆，再画小实心圆
-        overlay = frame.copy()
-        cv2.circle(overlay, p, 6, glow_color, -1, cv2.LINE_AA)
-        cv2.addWeighted(overlay, 0.25, frame, 0.75, 0, frame)
-        cv2.circle(frame, p, 3, COLOR_HIGHLIGHT, -1, cv2.LINE_AA)
+def _draw_top_bar(frame, status_text: str, color) -> None:
+    """顶部简洁状态条：左上角小圆点 + 标题。"""
+    cv2.putText(frame, "FaceGuard", (14, 22),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.55, COLOR_TEXT, 1, cv2.LINE_AA)
+    cv2.circle(frame, (8, 18), 3, color, -1, cv2.LINE_AA)
+    cv2.putText(frame, status_text, (100, 22),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_TEXT_DIM, 1, cv2.LINE_AA)
 
 
-def draw_scanline_glass(frame, face, t: float | None = None) -> None:
-    """液态扫描线：柔光带 + 流动高光。"""
-    t = t if t is not None else time.time()
-    x, y, w, h = face.x, face.y, face.w, face.h
-    progress = (math.sin(t * 1.8) + 1) / 2
-    ly = int(y + progress * h)
-    # 主扫描线
-    cv2.line(frame, (x, ly), (x + w, ly), (255, 255, 255), 1, cv2.LINE_AA)
-    # 柔光带（上下各 10px 渐变）
-    for d in range(1, 14):
-        a = max(0, 70 - d * 5)
-        line_y_up = max(y, ly - d)
-        line_y_dn = min(y + h, ly + d)
-        if line_y_up < y + h:
-            cv2.line(frame, (x, line_y_up), (x + w, line_y_up),
-                     (200, 230, 255), 1, cv2.LINE_AA)
-        if line_y_dn < y + h:
-            cv2.line(frame, (x, line_y_dn), (x + w, line_y_dn),
-                     (200, 230, 255), 1, cv2.LINE_AA)
-
-
-def draw_glow_glass(frame, face, color, t: float | None = None) -> None:
-    """呼吸光晕：人脸框外圈脉动发光。"""
-    t = t if t is not None else time.time()
-    x, y, w, h = face.x, face.y, face.w, face.h
-    pulse = (math.sin(t * 2.5) + 1) / 2
-    alpha = 0.10 + 0.18 * pulse
-    pad = 8
-    overlay = frame.copy()
-    glow_color = _hue_rotate(color, t)
-    cv2.rectangle(overlay, (x - pad, y - pad), (x + w + pad, y + h + pad),
-                  glow_color, -1)
-    cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
-
-
-def draw_status_bar_glass(frame, text: str, color=COLOR_TEXT, t: float | None = None) -> None:
-    """底部状态栏（液态玻璃条）。"""
-    t = t if t is not None else time.time()
+def _draw_status_bar(frame, status: str, color) -> None:
+    """底部简洁状态栏。"""
     h, w = frame.shape[:2]
-    bar_h = 36
-    draw_glass_panel(frame, 0, h - bar_h, w, bar_h, COLOR_GLASS_EDGE, t)
-    cv2.putText(frame, text, (14, h - 12), cv2.FONT_HERSHEY_SIMPLEX,
-                0.55, COLOR_TEXT_SHADOW, 2, cv2.LINE_AA)
-    cv2.putText(frame, text, (14, h - 12), cv2.FONT_HERSHEY_SIMPLEX,
-                0.55, color, 1, cv2.LINE_AA)
-
-
-def draw_title_glass(frame, title: str = "FaceGuard", t: float | None = None) -> None:
-    """左上角液态玻璃标题胶囊。"""
-    t = t if t is not None else time.time()
-    (tw, th), _ = cv2.getTextSize(title, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)
-    pad_x, pad_y = 14, 8
-    w = tw + pad_x * 2
-    h = th + pad_y * 2
-    draw_glass_panel(frame, 10, 10, w, h, COLOR_OWNER, t)
-    cv2.putText(frame, title, (10 + pad_x, 10 + pad_y + th - 2),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_TEXT_SHADOW, 2, cv2.LINE_AA)
-    cv2.putText(frame, title, (10 + pad_x, 10 + pad_y + th - 2),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_HIGHLIGHT, 1, cv2.LINE_AA)
+    bar_h = 30
+    # 半透明黑底
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (0, h - bar_h), (w, h), COLOR_BG_BAR, -1)
+    cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
+    # 状态点
+    cv2.circle(frame, (16, h - bar_h // 2), 3, color, -1, cv2.LINE_AA)
+    cv2.putText(frame, status, (28, h - 11),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_TEXT, 1, cv2.LINE_AA)
 
 
 # ---------- 主渲染入口 ----------
 
 def render_overlay(frame, faces, owner_name, confidence, status: str,
                    cfg: dict, t: float | None = None) -> np.ndarray:
-    """液态玻璃主渲染：在帧上叠加全部特效。"""
+    """简洁风格主渲染：蓝色激光点阵 + 细线人脸框 + 状态栏。"""
     t = t if t is not None else time.time()
     ocfg = cfg.get("overlay", {})
-    show_lm = ocfg.get("show_landmarks", True)
     show_scan = ocfg.get("show_scanline", True)
     show_conf = ocfg.get("show_confidence", True)
 
+    top_color = COLOR_OWNER  # 默认蓝
     for face in faces:
         is_owner = owner_name is not None
         color = COLOR_OWNER if is_owner else COLOR_STRANGER
-        label = owner_name if is_owner else "未知"
-        if show_scan:
-            draw_scanline_glass(frame, face, t)
-        draw_glow_glass(frame, face, color, t)
-        if show_lm:
-            draw_landmarks_glass(frame, face, color, t)
-        draw_face_glass(frame, face, label, color,
-                        confidence if show_conf else None, show_conf, t)
+        label = owner_name if is_owner else "Unknown"
 
-    draw_title_glass(frame, "FaceGuard", t)
-    draw_status_bar_glass(frame, status, COLOR_TEXT, t)
+        # 蓝色激光点阵（核心可视化，跟随 landmarks 实时变动）
+        _draw_laser_mesh(frame, face, color, t)
+
+        # 简洁人脸框
+        _draw_face_box(frame, face, color, t)
+
+        # 扫描线（识别中时显示）
+        if show_scan and not is_owner:
+            _draw_scan_line(frame, face, t)
+
+        # 标签
+        _draw_label(frame, face, label, color,
+                    confidence if show_conf else None)
+
+    # 顶部 + 底部状态栏
+    top_status = "Active" if faces else "Standby"
+    _draw_top_bar(frame, top_status, top_color)
+    _draw_status_bar(frame, status, top_color)
     return frame

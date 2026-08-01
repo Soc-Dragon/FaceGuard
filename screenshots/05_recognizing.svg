@@ -2,352 +2,444 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
 
 <defs>
-  <!-- ═══ 真实毛玻璃滤镜（背景模糊） ═══ -->
-  <filter id="glassBlur" x="-30%" y="-30%" width="160%" height="160%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="14"/>
-  </filter>
-  <filter id="glassBlurLg" x="-30%" y="-30%" width="160%" height="160%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="28"/>
-  </filter>
-  <filter id="glassBlurSm" x="-20%" y="-20%" width="140%" height="140%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="6"/>
-  </filter>
-
-  <!-- ═══ 镜面高光滤镜（边缘折射） ═══ -->
-  <filter id="specular" x="-20%" y="-20%" width="140%" height="140%">
-    <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>
-    <feSpecularLighting in="blur" surfaceScale="5" specularConstant="0.9"
-                        specularExponent="25" lighting-color="#ffffff" result="spec">
-      <feDistantLight azimuth="225" elevation="55"/>
-    </feSpecularLighting>
-    <feComposite in="spec" in2="SourceAlpha" operator="in" result="specOut"/>
-    <feComposite in="SourceGraphic" in2="specOut" operator="arithmetic"
-                 k1="0" k2="1" k3="0.8" k4="0"/>
-  </filter>
-
-  <!-- ═══ 液态折射滤镜（微扭曲） ═══ -->
-  <filter id="liquidRefract" x="-10%" y="-10%" width="120%" height="120%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.018"
-                  numOctaves="2" seed="3" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="6"
-                       xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-
-  <!-- ═══ 发光 / 泛光滤镜 ═══ -->
-  <filter id="bloom" x="-50%" y="-50%" width="200%" height="200%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+  <!-- 激光点光晕 -->
+  <filter id="laserGlow" x="-100%" y="-100%" width="300%" height="300%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur"/>
     <feMerge>
       <feMergeNode in="blur"/>
       <feMergeNode in="blur"/>
       <feMergeNode in="SourceGraphic"/>
     </feMerge>
   </filter>
-  <filter id="bloomStrong" x="-80%" y="-80%" width="260%" height="260%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
-    <feMerge>
-      <feMergeNode in="blur"/>
-      <feMergeNode in="blur"/>
-      <feMergeNode in="blur"/>
-      <feMergeNode in="SourceGraphic"/>
-    </feMerge>
-  </filter>
-  <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+  <filter id="laserGlowSm" x="-100%" y="-100%" width="300%" height="300%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur"/>
     <feMerge>
       <feMergeNode in="blur"/>
       <feMergeNode in="SourceGraphic"/>
     </feMerge>
   </filter>
-
-  <!-- ═══ 背景壁纸渐变（macOS Sonoma 风格彩色网格） ═══ -->
-  <linearGradient id="wallpaperBase" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%"  stop-color="#1A1033"/>
-    <stop offset="35%" stop-color="#2D1B4E"/>
-    <stop offset="65%" stop-color="#1E1A3D"/>
-    <stop offset="100%" stop-color="#0D0F1E"/>
-  </linearGradient>
-
-  <!-- 彩色光斑 -->
-  <radialGradient id="blobPurple" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#BF5AF2" stop-opacity="0.7"/>
-    <stop offset="100%" stop-color="#BF5AF2" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobPink" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#FF375F" stop-opacity="0.55"/>
-    <stop offset="100%" stop-color="#FF375F" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobOrange" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#FF9F0A" stop-opacity="0.5"/>
-    <stop offset="100%" stop-color="#FF9F0A" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobBlue" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#0A84FF" stop-opacity="0.5"/>
-    <stop offset="100%" stop-color="#0A84FF" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobMint" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#30D58C" stop-opacity="0.4"/>
-    <stop offset="100%" stop-color="#30D58C" stop-opacity="0"/>
-  </radialGradient>
-
-  <!-- ═══ 玻璃面板材质 ═══ -->
-  <linearGradient id="glassFill" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.14"/>
-    <stop offset="50%" stop-color="#ffffff" stop-opacity="0.06"/>
-    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.03"/>
-  </linearGradient>
-  <linearGradient id="glassHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.35"/>
-    <stop offset="30%" stop-color="#ffffff" stop-opacity="0.08"/>
-    <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-  </linearGradient>
-  <linearGradient id="glassEdge" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.4"/>
-    <stop offset="50%" stop-color="#ffffff" stop-opacity="0.1"/>
-    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.25"/>
-  </linearGradient>
-
-  <!-- ═══ 强调色按钮渐变 ═══ -->
-  <linearGradient id="btnMint" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#5EEAB5"/>
-    <stop offset="100%" stop-color="#28B574"/>
-  </linearGradient>
-  <linearGradient id="btnPurple" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#D070FF"/>
-    <stop offset="100%" stop-color="#9B30DC"/>
-  </linearGradient>
-
-  <!-- ═══ 流光边框（彩虹渐变） ═══ -->
-  <linearGradient id="rainbowBorder" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%"   stop-color="#30D58C"/>
-    <stop offset="25%"  stop-color="#5EEAB5"/>
-    <stop offset="50%"  stop-color="#0A84FF"/>
-    <stop offset="75%"  stop-color="#BF5AF2"/>
-    <stop offset="100%" stop-color="#FF375F"/>
-  </linearGradient>
-
-  <!-- ═══ 扫描线渐变 ═══ -->
-  <linearGradient id="scanGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"   stop-color="#5EEAB5" stop-opacity="0"/>
-    <stop offset="50%"  stop-color="#5EEAB5" stop-opacity="1"/>
-    <stop offset="100%" stop-color="#5EEAB5" stop-opacity="0"/>
-  </linearGradient>
-
-  <!-- ═══ 阴影滤镜 ═══ -->
-  <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
-    <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.4"/>
+  <!-- 扫描线光晕 -->
+  <filter id="scanGlow" x="-20%" y="-200%" width="140%" height="500%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="3"/>
   </filter>
-  <filter id="dropShadowSm" x="-20%" y="-20%" width="140%" height="140%">
-    <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.3"/>
-  </filter>
-  <filter id="txtShadow" x="-50%" y="-50%" width="200%" height="200%">
-    <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.6"/>
-  </filter>
+  <!-- 背景渐变 -->
+  <radialGradient id="bgGrad" cx="50%" cy="40%" r="70%">
+    <stop offset="0%"  stop-color="#1A1A24"/>
+    <stop offset="100%" stop-color="#0A0A0E"/>
+  </radialGradient>
 </defs>
 
+<rect width="800" height="600" fill="url(#bgGrad)"/>
 
-  <!-- 深色底 -->
-  <rect width="800" height="600" fill="url(#wallpaperBase)"/>
-  <!-- 彩色光斑（大模糊，模拟渐变网格） -->
-  <ellipse cx="120.0" cy="120.0" rx="280.0" ry="210.0" fill="url(#blobPurple)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="680.0" cy="90.0" rx="240.0" ry="180.0" fill="url(#blobPink)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="640.0" cy="480.0" rx="280.0" ry="210.0" fill="url(#blobOrange)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="160.0" cy="510.0" rx="240.0" ry="180.0" fill="url(#blobBlue)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="400.0" cy="300.0" rx="200.0" ry="150.0" fill="url(#blobMint)" filter="url(#glassBlurLg)"/>
-  <!-- 微粒噪点（模拟壁纸纹理） -->
-  <rect width="800" height="600" fill="url(#wallpaperBase)" opacity="0.15"/>
+  <ellipse cx="270" cy="260" rx="55" ry="70" fill="#1A1A24" opacity="0.8"/>
+  <path d="M195,370 Q195,310 270,310 Q345,310 345,370 Z" fill="#1A1A24" opacity="0.8"/>
 
+  <!-- 蓝色激光点阵 -->
+  <circle cx="362.4" cy="294.8" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="362.4" cy="294.8" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="361.89382313202844" cy="306.8416789684337" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="361.89382313202844" cy="306.8416789684337" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="360.38083830780363" cy="318.7514267822059" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="360.38083830780363" cy="318.7514267822059" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="357.8776221056722" cy="330.39875775199397" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="357.8776221056722" cy="330.39875775199397" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="354.4116002861763" cy="341.6560612823322" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="354.4116002861763" cy="341.6560612823322" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="350.0207473096821" cy="352.4" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="350.0207473096821" cy="352.4" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="344.7531702802452" cy="362.51286106409293" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="344.7531702802452" cy="362.51286106409293" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="338.6665818741112" cy="371.88384585254045" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="338.6665818741112" cy="371.88384585254045" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="331.8276680275585" cy="380.4102838949958" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="331.8276680275585" cy="380.4102838949958" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="324.3113573118245" cy="387.99875775199394" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="324.3113573118245" cy="387.99875775199394" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="316.2" cy="394.5661265159673" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="316.2" cy="394.5661265159673" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="307.58246582020394" cy="400.04043672042764" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="307.58246582020394" cy="400.04043672042764" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="298.5531702802451" cy="404.3617106772017" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="298.5531702802451" cy="404.3617106772017" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="289.21104023156096" cy="407.4826036045344" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="289.21104023156096" cy="407.4826036045344" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="279.65843000593117" cy="409.3689223464251" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="279.65843000593117" cy="409.3689223464251" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="410.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="410.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="260.34156999406883" cy="409.3689223464251" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="260.34156999406883" cy="409.3689223464251" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="250.78895976843904" cy="407.4826036045344" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="250.78895976843904" cy="407.4826036045344" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="241.44682971975487" cy="404.3617106772017" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="241.44682971975487" cy="404.3617106772017" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="232.41753417979606" cy="400.04043672042764" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="232.41753417979606" cy="400.04043672042764" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="223.8" cy="394.56612651596737" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="223.8" cy="394.56612651596737" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="215.6886426881755" cy="387.99875775199394" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="215.6886426881755" cy="387.99875775199394" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="208.1723319724415" cy="380.4102838949958" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="208.1723319724415" cy="380.4102838949958" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="201.33341812588878" cy="371.8838458525405" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="201.33341812588878" cy="371.8838458525405" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="195.24682971975488" cy="362.51286106409293" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="195.24682971975488" cy="362.51286106409293" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="189.97925269031788" cy="352.4" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="189.97925269031788" cy="352.4" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="185.58839971382372" cy="341.65606128233225" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="185.58839971382372" cy="341.65606128233225" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="182.12237789432783" cy="330.39875775199397" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="182.12237789432783" cy="330.39875775199397" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="179.61916169219637" cy="318.7514267822059" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="179.61916169219637" cy="318.7514267822059" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="178.10617686797156" cy="306.8416789684337" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="178.10617686797156" cy="306.8416789684337" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="177.60000000000002" cy="294.8" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="177.60000000000002" cy="294.8" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="178.10617686797156" cy="282.7583210315663" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="178.10617686797156" cy="282.7583210315663" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="179.61916169219637" cy="270.8485732177941" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="179.61916169219637" cy="270.8485732177941" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="182.12237789432783" cy="259.20124224800605" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="182.12237789432783" cy="259.20124224800605" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="185.5883997138237" cy="247.94393871766783" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="185.5883997138237" cy="247.94393871766783" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="189.97925269031788" cy="237.2" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="189.97925269031788" cy="237.2" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="195.24682971975486" cy="227.08713893590712" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="195.24682971975486" cy="227.08713893590712" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="201.33341812588878" cy="217.71615414745955" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="201.33341812588878" cy="217.71615414745955" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="208.1723319724415" cy="209.1897161050042" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="208.1723319724415" cy="209.1897161050042" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="215.6886426881755" cy="201.6012422480061" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="215.6886426881755" cy="201.6012422480061" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="223.79999999999995" cy="195.0338734840327" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="223.79999999999995" cy="195.0338734840327" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="232.41753417979606" cy="189.5595632795724" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="232.41753417979606" cy="189.5595632795724" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="241.44682971975485" cy="185.23828932279832" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="241.44682971975485" cy="185.23828932279832" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="250.78895976843899" cy="182.11739639546562" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="250.78895976843899" cy="182.11739639546562" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="260.34156999406883" cy="180.2310776535749" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="260.34156999406883" cy="180.2310776535749" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="179.60000000000002" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="179.60000000000002" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="279.6584300059311" cy="180.2310776535749" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="279.6584300059311" cy="180.2310776535749" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="289.21104023156096" cy="182.11739639546562" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="289.21104023156096" cy="182.11739639546562" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="298.5531702802451" cy="185.23828932279832" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="298.5531702802451" cy="185.23828932279832" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="307.5824658202039" cy="189.5595632795724" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="307.5824658202039" cy="189.5595632795724" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="316.2" cy="195.0338734840327" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="316.2" cy="195.0338734840327" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="324.3113573118245" cy="201.60124224800606" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="324.3113573118245" cy="201.60124224800606" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="331.82766802755845" cy="209.18971610500415" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="331.82766802755845" cy="209.18971610500415" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="338.6665818741112" cy="217.71615414745958" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="338.6665818741112" cy="217.71615414745958" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="344.7531702802451" cy="227.0871389359071" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="344.7531702802451" cy="227.0871389359071" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="350.02074730968206" cy="237.19999999999996" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="350.02074730968206" cy="237.19999999999996" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="354.41160028617634" cy="247.94393871766783" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="354.41160028617634" cy="247.94393871766783" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="357.8776221056722" cy="259.20124224800605" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="357.8776221056722" cy="259.20124224800605" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="360.38083830780363" cy="270.84857321779407" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="360.38083830780363" cy="270.84857321779407" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="361.89382313202844" cy="282.75832103156637" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="361.89382313202844" cy="282.75832103156637" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="247.6" cy="275.0" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="247.6" cy="275.0" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="247.17066541124225" cy="277.1740799788612" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="247.17066541124225" cy="277.1740799788612" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="245.91192008768394" cy="279.2" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="245.91192008768394" cy="279.2" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="243.9095454429505" cy="280.939696961967" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="243.9095454429505" cy="280.939696961967" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="241.3" cy="282.2746133917893" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="241.3" cy="282.2746133917893" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="238.26111996829175" cy="283.1137769408282" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="238.26111996829175" cy="283.1137769408282" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="235.0" cy="283.4" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="235.0" cy="283.4" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="231.73888003170825" cy="283.1137769408282" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="231.73888003170825" cy="283.1137769408282" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="228.7" cy="282.2746133917893" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="228.7" cy="282.2746133917893" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="226.0904545570495" cy="280.939696961967" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="226.0904545570495" cy="280.939696961967" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="224.08807991231606" cy="279.2" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="224.08807991231606" cy="279.2" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="222.82933458875775" cy="277.1740799788612" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="222.82933458875775" cy="277.1740799788612" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="222.4" cy="275.0" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="222.4" cy="275.0" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="222.82933458875775" cy="272.8259200211388" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="222.82933458875775" cy="272.8259200211388" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="224.08807991231606" cy="270.8" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="224.08807991231606" cy="270.8" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="226.0904545570495" cy="269.060303038033" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="226.0904545570495" cy="269.060303038033" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="228.7" cy="267.7253866082107" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="228.7" cy="267.7253866082107" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="231.73888003170825" cy="266.8862230591718" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="231.73888003170825" cy="266.8862230591718" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="235.0" cy="266.6" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="235.0" cy="266.6" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="238.26111996829175" cy="266.8862230591718" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="238.26111996829175" cy="266.8862230591718" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="241.3" cy="267.7253866082107" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="241.3" cy="267.7253866082107" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="243.9095454429505" cy="269.060303038033" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="243.9095454429505" cy="269.060303038033" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="245.9119200876839" cy="270.8" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="245.9119200876839" cy="270.8" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="247.17066541124225" cy="272.8259200211388" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="247.17066541124225" cy="272.8259200211388" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="317.6" cy="275.0" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="317.6" cy="275.0" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="317.1706654112423" cy="277.1740799788612" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="317.1706654112423" cy="277.1740799788612" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="315.91192008768394" cy="279.2" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="315.91192008768394" cy="279.2" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="313.9095454429505" cy="280.939696961967" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="313.9095454429505" cy="280.939696961967" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="311.3" cy="282.2746133917893" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="311.3" cy="282.2746133917893" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="308.2611199682918" cy="283.1137769408282" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="308.2611199682918" cy="283.1137769408282" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="305.0" cy="283.4" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="305.0" cy="283.4" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="301.7388800317082" cy="283.1137769408282" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="301.7388800317082" cy="283.1137769408282" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="298.7" cy="282.2746133917893" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="298.7" cy="282.2746133917893" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="296.0904545570495" cy="280.939696961967" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="296.0904545570495" cy="280.939696961967" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="294.08807991231606" cy="279.2" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="294.08807991231606" cy="279.2" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="292.8293345887577" cy="277.1740799788612" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="292.8293345887577" cy="277.1740799788612" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="292.4" cy="275.0" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="292.4" cy="275.0" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="292.8293345887577" cy="272.8259200211388" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="292.8293345887577" cy="272.8259200211388" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="294.08807991231606" cy="270.8" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="294.08807991231606" cy="270.8" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="296.0904545570495" cy="269.060303038033" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="296.0904545570495" cy="269.060303038033" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="298.7" cy="267.7253866082107" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="298.7" cy="267.7253866082107" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="301.7388800317082" cy="266.8862230591718" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="301.7388800317082" cy="266.8862230591718" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="305.0" cy="266.6" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="305.0" cy="266.6" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="308.2611199682918" cy="266.8862230591718" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="308.2611199682918" cy="266.8862230591718" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="311.3" cy="267.7253866082107" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="311.3" cy="267.7253866082107" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="313.9095454429505" cy="269.060303038033" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="313.9095454429505" cy="269.060303038033" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="315.91192008768394" cy="270.8" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="315.91192008768394" cy="270.8" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="317.1706654112423" cy="272.8259200211388" r="4.5" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="317.1706654112423" cy="272.8259200211388" r="1.5" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="235.0" cy="275.0" r="6" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="235.0" cy="275.0" r="2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="305.0" cy="275.0" r="6" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="305.0" cy="275.0" r="2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="221.0" cy="263.8" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="221.0" cy="263.8" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="224.5" cy="262.75" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="224.5" cy="262.75" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="228.0" cy="261.70000000000005" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="228.0" cy="261.70000000000005" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="231.5" cy="260.65000000000003" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="231.5" cy="260.65000000000003" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="235.0" cy="259.6" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="235.0" cy="259.6" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="238.5" cy="260.65000000000003" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="238.5" cy="260.65000000000003" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="242.0" cy="261.70000000000005" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="242.0" cy="261.70000000000005" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="245.5" cy="262.75" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="245.5" cy="262.75" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="249.0" cy="263.8" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="249.0" cy="263.8" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="291.0" cy="263.8" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="291.0" cy="263.8" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="294.5" cy="262.75" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="294.5" cy="262.75" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="298.0" cy="261.70000000000005" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="298.0" cy="261.70000000000005" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="301.5" cy="260.65000000000003" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="301.5" cy="260.65000000000003" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="305.0" cy="259.6" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="305.0" cy="259.6" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="308.5" cy="260.65000000000003" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="308.5" cy="260.65000000000003" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="312.0" cy="261.70000000000005" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="312.0" cy="261.70000000000005" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="315.5" cy="262.75" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="315.5" cy="262.75" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="319.0" cy="263.8" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="319.0" cy="263.8" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="271.5" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="271.5" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="274.85" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="274.85" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="278.20000000000005" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="278.20000000000005" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="281.54999999999995" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="281.54999999999995" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="284.9" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="284.9" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="288.25" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="288.25" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="291.6" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="291.6" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="294.95000000000005" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="294.95000000000005" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="298.3" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="298.3" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="301.65" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="301.65" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="305.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="305.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="276.06217782649105" cy="308.5" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="276.06217782649105" cy="308.5" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="274.49951326780575" cy="310.36231110183286" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="274.49951326780575" cy="310.36231110183286" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="272.3941410032797" cy="311.57784834550137" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="272.3941410032797" cy="311.57784834550137" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="312.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="312.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="267.6058589967203" cy="311.57784834550137" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="267.6058589967203" cy="311.57784834550137" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="265.50048673219425" cy="310.36231110183286" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="265.50048673219425" cy="310.36231110183286" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="263.93782217350895" cy="308.5" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="263.93782217350895" cy="308.5" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="297.8" cy="335.0" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="297.8" cy="335.0" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="297.1925033003998" cy="335.8732291014346" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="297.1925033003998" cy="335.8732291014346" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="295.3965637224643" cy="336.70829390091836" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="295.3965637224643" cy="336.70829390091836" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="292.49067244362357" cy="337.46869805962837" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="292.49067244362357" cy="337.46869805962837" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="288.60183085677625" cy="338.12120826700504" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="288.60183085677625" cy="338.12120826700504" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="283.9" cy="338.63730669589467" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="283.9" cy="338.63730669589467" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="278.59067244362353" cy="338.99443736843966" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="278.59067244362353" cy="338.99443736843966" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="272.9058912788408" cy="339.17699196054673" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="272.9058912788408" cy="339.17699196054673" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="267.0941087211592" cy="339.17699196054673" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="267.0941087211592" cy="339.17699196054673" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="261.40932755637647" cy="338.99443736843966" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="261.40932755637647" cy="338.99443736843966" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="256.1" cy="338.63730669589467" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="256.1" cy="338.63730669589467" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="251.39816914322375" cy="338.12120826700504" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="251.39816914322375" cy="338.12120826700504" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="247.50932755637646" cy="337.46869805962837" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="247.50932755637646" cy="337.46869805962837" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="244.6034362775357" cy="336.70829390091836" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="244.6034362775357" cy="336.70829390091836" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="242.8074966996002" cy="335.8732291014346" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="242.8074966996002" cy="335.8732291014346" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="242.2" cy="335.0" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="242.2" cy="335.0" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="242.8074966996002" cy="334.1267708985654" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="242.8074966996002" cy="334.1267708985654" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="244.6034362775357" cy="333.29170609908164" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="244.6034362775357" cy="333.29170609908164" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="247.50932755637646" cy="332.53130194037163" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="247.50932755637646" cy="332.53130194037163" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="251.39816914322375" cy="331.87879173299496" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="251.39816914322375" cy="331.87879173299496" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="256.09999999999997" cy="331.36269330410533" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="256.09999999999997" cy="331.36269330410533" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="261.40932755637647" cy="331.00556263156034" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="261.40932755637647" cy="331.00556263156034" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="267.0941087211592" cy="330.82300803945327" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="267.0941087211592" cy="330.82300803945327" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="272.9058912788407" cy="330.82300803945327" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="272.9058912788407" cy="330.82300803945327" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="278.59067244362353" cy="331.00556263156034" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="278.59067244362353" cy="331.00556263156034" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="283.9" cy="331.36269330410533" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="283.9" cy="331.36269330410533" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="288.60183085677625" cy="331.87879173299496" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="288.60183085677625" cy="331.87879173299496" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="292.49067244362357" cy="332.53130194037163" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="292.49067244362357" cy="332.53130194037163" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="295.3965637224643" cy="333.29170609908164" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="295.3965637224643" cy="333.29170609908164" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="297.1925033003998" cy="334.1267708985654" r="3.9000000000000004" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="297.1925033003998" cy="334.1267708985654" r="1.3" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="244.98" cy="335.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="244.98" cy="335.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="249.984" cy="335.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="249.984" cy="335.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="254.988" cy="335.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="254.988" cy="335.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="259.992" cy="335.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="259.992" cy="335.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="264.996" cy="335.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="264.996" cy="335.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="270.0" cy="335.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="270.0" cy="335.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="275.004" cy="335.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="275.004" cy="335.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="280.008" cy="335.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="280.008" cy="335.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="285.012" cy="335.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="285.012" cy="335.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="290.016" cy="335.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="290.016" cy="335.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
+<circle cx="295.02" cy="335.0" r="3.5999999999999996" fill="#4DA8FF" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="295.02" cy="335.0" r="1.2" fill="#ffffff" filter="url(#laserGlowSm)"/>
 
-  <rect x="30" y="30" width="740" height="540" rx="28" fill="#000000" opacity="0.25" filter="url(#dropShadow)"/>
-  
-  <ellipse cx="270" cy="221.0" rx="71.5" ry="91.0" fill="#3A3A5C" opacity="0.7"/>
-  <path d="M172.5,364.0 Q172.5,286.0 270,286.0 Q367.5,286.0 367.5,364.0 Z" fill="#3A3A5C" opacity="0.7"/>
-
-  <!-- 扫描中光晕 -->
-  
-  <defs>
-    <radialGradient id="halo_6" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"  stop-color="#5EEAB5" stop-opacity="0.35"/>
-      <stop offset="40%" stop-color="#5EEAB5" stop-opacity="0.13999999999999999"/>
-      <stop offset="100%" stop-color="#5EEAB5" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <circle cx="270" cy="250" r="160" fill="url(#halo_6)" filter="url(#bloomStrong)"/>
-
-  <!-- 人脸框（虚线，扫描中） -->
-  <rect x="160" y="130" width="220" height="230" rx="22" fill="none"
-        stroke="#5EEAB5" stroke-width="2" stroke-dasharray="10 6" opacity="0.8" filter="url(#bloom)"/>
+  <!-- 虚线人脸框（扫描中） -->
+  <rect x="160" y="160" width="220" height="240" fill="none" stroke="#4DA8FF" stroke-width="1" stroke-dasharray="8 5" opacity="0.7"/>
 
   <!-- 扫描线 -->
-  
-  <!-- 扫描线泛光带 -->
-  <rect x="160" y="130" width="220" height="230" fill="none"/>
-  <rect x="160" y="213.5" width="220" height="40" fill="#5EEAB5" opacity="0.08" filter="url(#glassBlur)"/>
-  <rect x="160" y="225.5" width="220" height="16" fill="#5EEAB5" opacity="0.2" filter="url(#glassBlurSm)"/>
-  <!-- 主扫描线 -->
-  <rect x="160" y="232.5" width="220" height="2" fill="#5EEAB5" filter="url(#bloom)"/>
+  <rect x="160" y="250.0" width="220" height="12" fill="#4DA8FF" opacity="0.15" filter="url(#scanGlow)"/>
+<rect x="160" y="255.5" width="220" height="1" fill="#4DA8FF"/>
 
-  <!-- 关键点连线 -->
-<line x1="231.0" y1="230.5" x2="309.0" y2="230.5" stroke="#5EEAB5" stroke-width="1" stroke-opacity="0.35"/>
-<line x1="309.0" y1="230.5" x2="270" y2="256.5" stroke="#5EEAB5" stroke-width="1" stroke-opacity="0.35"/>
-<line x1="270" y1="256.5" x2="241.4" y2="295.5" stroke="#5EEAB5" stroke-width="1" stroke-opacity="0.35"/>
-<line x1="270" y1="256.5" x2="298.6" y2="295.5" stroke="#5EEAB5" stroke-width="1" stroke-opacity="0.35"/>
-<line x1="241.4" y1="295.5" x2="298.6" y2="295.5" stroke="#5EEAB5" stroke-width="1" stroke-opacity="0.35"/>
-<!-- 发光关键点 -->
-<circle cx="231.0" cy="230.5" r="8" fill="#5EEAB5" opacity="0.25" filter="url(#bloom)"/>
-<circle cx="231.0" cy="230.5" r="3" fill="#ffffff" filter="url(#softGlow)"/>
-<circle cx="309.0" cy="230.5" r="8" fill="#5EEAB5" opacity="0.25" filter="url(#bloom)"/>
-<circle cx="309.0" cy="230.5" r="3" fill="#ffffff" filter="url(#softGlow)"/>
-<circle cx="270" cy="256.5" r="8" fill="#5EEAB5" opacity="0.25" filter="url(#bloom)"/>
-<circle cx="270" cy="256.5" r="3" fill="#ffffff" filter="url(#softGlow)"/>
-<circle cx="241.4" cy="295.5" r="8" fill="#5EEAB5" opacity="0.25" filter="url(#bloom)"/>
-<circle cx="241.4" cy="295.5" r="3" fill="#ffffff" filter="url(#softGlow)"/>
-<circle cx="298.6" cy="295.5" r="8" fill="#5EEAB5" opacity="0.25" filter="url(#bloom)"/>
-<circle cx="298.6" cy="295.5" r="3" fill="#ffffff" filter="url(#softGlow)"/>
+  <!-- 右侧进度面板（简洁） -->
+  <text x="500" y="180" font-family="Source Han Sans SC, sans-serif" font-size="16" font-weight="600" fill="#F5F5F7">正在识别</text>
+  <text x="500" y="205" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="#8E8E93">多帧确认确保安全</text>
 
-  <!-- 右侧识别面板 -->
-  
-  <!-- 玻璃面板 @(460,150) 310x280 -->
-  <defs>
-    <clipPath id="clip_460_150_310_280">
-      <rect x="460" y="150" width="310" height="280" rx="22"/>
-    </clipPath>
-  </defs>
-  <g filter="url(#dropShadow)">
+  <text x="500" y="245" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">多帧确认</text>
+  <rect x="500" y="253" width="240" height="6" rx="3" fill="#ffffff" opacity="0.1"/>
+  <rect x="500" y="253" width="161" height="6" rx="3" fill="#4DA8FF" filter="url(#laserGlow)"/>
+  <text x="740" y="245" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#4DA8FF" text-anchor="end">2/3</text>
 
-    <g clip-path="url(#clip_460_150_310_280)">
-      <!-- 模糊的彩色背景 -->
-      <rect x="460" y="150" width="310" height="280" fill="url(#wallpaperBase)"/>
-      <ellipse cx="522.0" cy="234.0" rx="124.0" ry="112.0" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
-      <ellipse cx="708.0" cy="346.0" rx="108.5" ry="98.0" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
-      <!-- 玻璃半透明叠层 -->
-      <rect x="460" y="150" width="310" height="280" fill="url(#glassFill)"/>
-      <!-- 顶部镜面高光 -->
-      <rect x="460" y="150" width="310" height="140.0" rx="22" fill="url(#glassHighlight)"/>
-    </g>
+  <text x="500" y="290" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">特征提取</text>
+  <rect x="500" y="298" width="240" height="6" rx="3" fill="#ffffff" opacity="0.1"/>
+  <rect x="500" y="298" width="204" height="6" rx="3" fill="#4DA8FF" filter="url(#laserGlow)"/>
+  <text x="740" y="290" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#4DA8FF" text-anchor="end">85%</text>
 
-    <rect x="460" y="150" width="310" height="280" rx="22" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="461.5" y="151.5" width="307" height="277" rx="20.5" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>
-  <text x="490" y="195" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="18" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">正在识别</text>
-  <text x="490" y="220" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">多帧确认确保安全</text>
+  <text x="500" y="335" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">活体检测</text>
+  <rect x="500" y="343" width="240" height="6" rx="3" fill="#ffffff" opacity="0.1"/>
+  <rect x="500" y="343" width="221" height="6" rx="3" fill="#4DA8FF" filter="url(#laserGlow)"/>
+  <text x="740" y="335" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#4DA8FF" text-anchor="end">92%</text>
 
-  <!-- 帧确认进度 -->
-  <text x="490" y="260" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">多帧确认</text>
-  
-  <defs>
-    <linearGradient id="pg_490_270" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%"  stop-color="#5EEAB5" stop-opacity="0.7"/>
-      <stop offset="100%" stop-color="#5EEAB5" stop-opacity="1"/>
-    </linearGradient>
-  </defs>
-  <rect x="490" y="270" width="250" height="8" rx="4.0" fill="rgba(255,255,255,0.1)"/>
-  <rect x="490" y="270" width="167.5" height="8" rx="4.0" fill="url(#pg_490_270)" filter="url(#bloom)"/>
-  <text x="740" y="260" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#5EEAB5" fill-opacity="1.0" text-anchor="end">2/3</text>
-
-  <!-- 特征提取状态 -->
-  <text x="490" y="305" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">特征提取</text>
-  
-  <defs>
-    <linearGradient id="pg_490_315" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%"  stop-color="#409CFF" stop-opacity="0.7"/>
-      <stop offset="100%" stop-color="#409CFF" stop-opacity="1"/>
-    </linearGradient>
-  </defs>
-  <rect x="490" y="315" width="250" height="8" rx="4.0" fill="rgba(255,255,255,0.1)"/>
-  <rect x="490" y="315" width="212.5" height="8" rx="4.0" fill="url(#pg_490_315)" filter="url(#bloom)"/>
-  <text x="740" y="305" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#409CFF" fill-opacity="1.0" text-anchor="end">85%</text>
-
-  <!-- 活体检测 -->
-  <text x="490" y="350" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">活体检测</text>
-  
-  <defs>
-    <linearGradient id="pg_490_360" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%"  stop-color="#D070FF" stop-opacity="0.7"/>
-      <stop offset="100%" stop-color="#D070FF" stop-opacity="1"/>
-    </linearGradient>
-  </defs>
-  <rect x="490" y="360" width="250" height="8" rx="4.0" fill="rgba(255,255,255,0.1)"/>
-  <rect x="490" y="360" width="230.0" height="8" rx="4.0" fill="url(#pg_490_360)" filter="url(#bloom)"/>
-  <text x="740" y="350" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#D070FF" fill-opacity="1.0" text-anchor="end">92%</text>
-
-  <!-- 模型信息 -->
-  
-  <!-- 玻璃面板 @(480,390) 270x28 -->
-  <defs>
-    <clipPath id="clip_480_390_270_28">
-      <rect x="480" y="390" width="270" height="28" rx="14"/>
-    </clipPath>
-  </defs>
-  <g>
-
-    <rect x="480" y="390" width="270" height="28" rx="14" fill="url(#glassFill)"/>
-    <rect x="480" y="390" width="270" height="11.200000000000001" rx="14" fill="url(#glassHighlight)"/>
-
-    <rect x="480" y="390" width="270" height="28" rx="14" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="481.5" y="391.5" width="267" height="25" rx="12.5" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>
-  <text x="494" y="408" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">YuNet + SFace</text>
-
-  <!-- 顶部状态 -->
-  
-  <!-- 玻璃面板 @(30,40) 300x52 -->
-  <defs>
-    <clipPath id="clip_30_40_300_52">
-      <rect x="30" y="40" width="300" height="52" rx="26"/>
-    </clipPath>
-  </defs>
-  <g filter="url(#dropShadow)">
-
-    <g clip-path="url(#clip_30_40_300_52)">
-      <!-- 模糊的彩色背景 -->
-      <rect x="30" y="40" width="300" height="52" fill="url(#wallpaperBase)"/>
-      <ellipse cx="90.0" cy="55.6" rx="120.0" ry="20.8" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
-      <ellipse cx="270.0" cy="76.4" rx="105.0" ry="18.2" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
-      <!-- 玻璃半透明叠层 -->
-      <rect x="30" y="40" width="300" height="52" fill="url(#glassFill)"/>
-      <!-- 顶部镜面高光 -->
-      <rect x="30" y="40" width="300" height="26.0" rx="26" fill="url(#glassHighlight)"/>
-    </g>
-
-    <rect x="30" y="40" width="300" height="52" rx="26" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="31.5" y="41.5" width="297" height="49" rx="24.5" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>
-  <circle cx="56" cy="66" r="6" fill="#5EEAB5" filter="url(#bloom)"/>
-  <text x="72" y="71" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">FaceGuard</text>
-  <text x="186" y="71" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="500" fill="#5EEAB5" fill-opacity="1.0" text-anchor="start">识别中</text>
-
-  <!-- 底部状态 -->
-  
-  <!-- 玻璃面板 @(30,520) 740x50 -->
-  <defs>
-    <clipPath id="clip_30_520_740_50">
-      <rect x="30" y="520" width="740" height="50" rx="18"/>
-    </clipPath>
-  </defs>
-  <g filter="url(#dropShadow)">
-
-    <g clip-path="url(#clip_30_520_740_50)">
-      <!-- 模糊的彩色背景 -->
-      <rect x="30" y="520" width="740" height="50" fill="url(#wallpaperBase)"/>
-      <ellipse cx="178.0" cy="535.0" rx="296.0" ry="20.0" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
-      <ellipse cx="622.0" cy="555.0" rx="259.0" ry="17.5" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
-      <!-- 玻璃半透明叠层 -->
-      <rect x="30" y="520" width="740" height="50" fill="url(#glassFill)"/>
-      <!-- 顶部镜面高光 -->
-      <rect x="30" y="520" width="740" height="25.0" rx="18" fill="url(#glassHighlight)"/>
-    </g>
-
-    <rect x="30" y="520" width="740" height="50" rx="18" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="31.5" y="521.5" width="737" height="47" rx="16.5" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>
-  <circle cx="58" cy="545" r="5" fill="#5EEAB5" filter="url(#bloom)"/>
-  <text x="74" y="550" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="15" font-weight="700" fill="#5EEAB5" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">◌ 识别中 · 多帧确认 2/3</text>
+  <circle cx="14" cy="20" r="3" fill="#4DA8FF"/>
+<text x="24" y="25" font-family="Source Han Sans SC, sans-serif" font-size="13" font-weight="600" fill="#F5F5F7">FaceGuard</text>
+<text x="100" y="25" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="#8E8E93">Scanning · 识别中</text>
+  <rect x="0" y="570" width="800" height="30" fill="#0A0A0E" opacity="0.8"/>
+<circle cx="16" cy="585" r="3" fill="#4DA8FF"/>
+<text x="28" y="590" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="500" fill="#F5F5F7">◌ 识别中 · 多帧确认 2/3</text>
 </svg>

@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 """
-FaceGuard · Liquid Glass UI 截图生成器（v2 — 全盘美学重写）
+FaceGuard · 简洁风格 UI 截图生成器（蓝色激光点阵版）
 
-设计语言（Tim Cook 审美 · Apple Liquid Glass 2025）：
-  · 真实毛玻璃：feGaussianBlur 对彩色背景做真实模糊，不是单纯半透明
-  · 镜面高光：feSpecularLighting 在玻璃边缘产生折射光斑
-  · 液态折射：feTurbulence + feDisplacementMap 模拟玻璃微折射
-  · 深度分层：多层玻璃叠加，每层模糊量不同
-  · macOS 壁纸背景：紫/粉/橙/蓝/青 彩色渐变网格，透过玻璃可见
-  · SF Pro 字体层级：思源黑体 SC，数字字重 200-900（修复乱码）
-  · 动效可视化：呼吸光晕 / 脉冲环 / 扫描线泛光 / 粒子闪烁 / 流光边框
-  · Apple 系统色：薄荷 #30D58C · 珊瑚 #FF453A · 琥珀 #FF9F0A · 蓝 #0A84FF · 紫 #BF5AF2
+设计：
+  · 极简：深色背景 + 细线 + 简洁文字，无花哨玻璃/光晕/粒子
+  · 蓝色激光点阵：SVG 模拟 OpenCV 渲染的激光点阵效果
+    - 中心亮白点 + 外圈蓝色光晕（feGaussianBlur）
+    - 面部轮廓椭圆点阵 + 五官点阵（眼睛/鼻梁/嘴唇/眉毛）
+  · 实时跟随：点阵基于 landmarks 位置生成
 渲染：SVG + cairosvg @ 2x 高清
 """
 
@@ -24,902 +21,527 @@ import cairosvg
 OUT = Path(__file__).parent / "screenshots"
 OUT.mkdir(exist_ok=True)
 
-# ═══════════════════════════════════════════════════════════════
-#  Apple 系统色板（Liquid Glass 2025）
-# ═══════════════════════════════════════════════════════════════
-C_MINT    = "#30D58C"   # 本人成功
-C_MINT_LT = "#5EEAB5"
-C_CORAL   = "#FF453A"   # 陌生人失败
-C_CORAL_LT= "#FF817A"
-C_AMBER   = "#FF9F0A"   # 警告
-C_AMBER_LT= "#FFBF47"
-C_BLUE    = "#0A84FF"   # 离开/信息
-C_BLUE_LT = "#409CFF"
-C_PURPLE  = "#BF5AF2"   # 模型/设置
-C_PURPLE_LT = "#D070FF"
-C_PINK    = "#FF375F"
-
-# 文字色
-T_PRIMARY   = "#F5F5F7"   # 苹果白
-T_SECONDARY = "#AEAEB2"   # 副文字
-T_HINT      = "#636366"   # 提示
-T_ON_GLASS  = "#FFFFFF"
-
-# 玻璃色
-GLASS_FILL     = "rgba(255,255,255,0.08)"
-GLASS_STROKE   = "rgba(255,255,255,0.18)"
-GLASS_INNER    = "rgba(255,255,255,0.06)"
-
-# ═══════════════════════════════════════════════════════════════
-#  SVG 设计系统：滤镜 / 渐变 / 背景壁纸
-# ═══════════════════════════════════════════════════════════════
+# 简洁配色
+C_LASER = "#008CFF"      # 激光蓝
+C_LASER_LT = "#4DA8FF"   # 激光蓝亮
+C_LASER_DIM = "#0066CC"  # 激光蓝暗
+C_RED = "#FF3B30"        # 陌生人红
+C_RED_LT = "#FF6B6B"
+C_AMBER = "#FF9500"      # 警告
+C_WHITE = "#F5F5F7"
+C_TEXT_DIM = "#8E8E93"
+C_TEXT_HINT = "#48484A"
+C_BG = "#0A0A0E"         # 深黑背景
+C_BG_PANEL = "#1C1C1E"   # 面板底
 
 SVG_DEFS = """
 <defs>
-  <!-- ═══ 真实毛玻璃滤镜（背景模糊） ═══ -->
-  <filter id="glassBlur" x="-30%" y="-30%" width="160%" height="160%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="14"/>
-  </filter>
-  <filter id="glassBlurLg" x="-30%" y="-30%" width="160%" height="160%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="28"/>
-  </filter>
-  <filter id="glassBlurSm" x="-20%" y="-20%" width="140%" height="140%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="6"/>
-  </filter>
-
-  <!-- ═══ 镜面高光滤镜（边缘折射） ═══ -->
-  <filter id="specular" x="-20%" y="-20%" width="140%" height="140%">
-    <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>
-    <feSpecularLighting in="blur" surfaceScale="5" specularConstant="0.9"
-                        specularExponent="25" lighting-color="#ffffff" result="spec">
-      <feDistantLight azimuth="225" elevation="55"/>
-    </feSpecularLighting>
-    <feComposite in="spec" in2="SourceAlpha" operator="in" result="specOut"/>
-    <feComposite in="SourceGraphic" in2="specOut" operator="arithmetic"
-                 k1="0" k2="1" k3="0.8" k4="0"/>
-  </filter>
-
-  <!-- ═══ 液态折射滤镜（微扭曲） ═══ -->
-  <filter id="liquidRefract" x="-10%" y="-10%" width="120%" height="120%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.018"
-                  numOctaves="2" seed="3" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="6"
-                       xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-
-  <!-- ═══ 发光 / 泛光滤镜 ═══ -->
-  <filter id="bloom" x="-50%" y="-50%" width="200%" height="200%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+  <!-- 激光点光晕 -->
+  <filter id="laserGlow" x="-100%" y="-100%" width="300%" height="300%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur"/>
     <feMerge>
       <feMergeNode in="blur"/>
       <feMergeNode in="blur"/>
       <feMergeNode in="SourceGraphic"/>
     </feMerge>
   </filter>
-  <filter id="bloomStrong" x="-80%" y="-80%" width="260%" height="260%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
-    <feMerge>
-      <feMergeNode in="blur"/>
-      <feMergeNode in="blur"/>
-      <feMergeNode in="blur"/>
-      <feMergeNode in="SourceGraphic"/>
-    </feMerge>
-  </filter>
-  <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+  <filter id="laserGlowSm" x="-100%" y="-100%" width="300%" height="300%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur"/>
     <feMerge>
       <feMergeNode in="blur"/>
       <feMergeNode in="SourceGraphic"/>
     </feMerge>
   </filter>
-
-  <!-- ═══ 背景壁纸渐变（macOS Sonoma 风格彩色网格） ═══ -->
-  <linearGradient id="wallpaperBase" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%"  stop-color="#1A1033"/>
-    <stop offset="35%" stop-color="#2D1B4E"/>
-    <stop offset="65%" stop-color="#1E1A3D"/>
-    <stop offset="100%" stop-color="#0D0F1E"/>
-  </linearGradient>
-
-  <!-- 彩色光斑 -->
-  <radialGradient id="blobPurple" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#BF5AF2" stop-opacity="0.7"/>
-    <stop offset="100%" stop-color="#BF5AF2" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobPink" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#FF375F" stop-opacity="0.55"/>
-    <stop offset="100%" stop-color="#FF375F" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobOrange" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#FF9F0A" stop-opacity="0.5"/>
-    <stop offset="100%" stop-color="#FF9F0A" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobBlue" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#0A84FF" stop-opacity="0.5"/>
-    <stop offset="100%" stop-color="#0A84FF" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobMint" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#30D58C" stop-opacity="0.4"/>
-    <stop offset="100%" stop-color="#30D58C" stop-opacity="0"/>
-  </radialGradient>
-
-  <!-- ═══ 玻璃面板材质 ═══ -->
-  <linearGradient id="glassFill" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.14"/>
-    <stop offset="50%" stop-color="#ffffff" stop-opacity="0.06"/>
-    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.03"/>
-  </linearGradient>
-  <linearGradient id="glassHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.35"/>
-    <stop offset="30%" stop-color="#ffffff" stop-opacity="0.08"/>
-    <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-  </linearGradient>
-  <linearGradient id="glassEdge" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.4"/>
-    <stop offset="50%" stop-color="#ffffff" stop-opacity="0.1"/>
-    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.25"/>
-  </linearGradient>
-
-  <!-- ═══ 强调色按钮渐变 ═══ -->
-  <linearGradient id="btnMint" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#5EEAB5"/>
-    <stop offset="100%" stop-color="#28B574"/>
-  </linearGradient>
-  <linearGradient id="btnPurple" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#D070FF"/>
-    <stop offset="100%" stop-color="#9B30DC"/>
-  </linearGradient>
-
-  <!-- ═══ 流光边框（彩虹渐变） ═══ -->
-  <linearGradient id="rainbowBorder" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%"   stop-color="#30D58C"/>
-    <stop offset="25%"  stop-color="#5EEAB5"/>
-    <stop offset="50%"  stop-color="#0A84FF"/>
-    <stop offset="75%"  stop-color="#BF5AF2"/>
-    <stop offset="100%" stop-color="#FF375F"/>
-  </linearGradient>
-
-  <!-- ═══ 扫描线渐变 ═══ -->
-  <linearGradient id="scanGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"   stop-color="#5EEAB5" stop-opacity="0"/>
-    <stop offset="50%"  stop-color="#5EEAB5" stop-opacity="1"/>
-    <stop offset="100%" stop-color="#5EEAB5" stop-opacity="0"/>
-  </linearGradient>
-
-  <!-- ═══ 阴影滤镜 ═══ -->
-  <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
-    <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.4"/>
+  <!-- 扫描线光晕 -->
+  <filter id="scanGlow" x="-20%" y="-200%" width="140%" height="500%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="3"/>
   </filter>
-  <filter id="dropShadowSm" x="-20%" y="-20%" width="140%" height="140%">
-    <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.3"/>
-  </filter>
-  <filter id="txtShadow" x="-50%" y="-50%" width="200%" height="200%">
-    <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.6"/>
-  </filter>
+  <!-- 背景渐变 -->
+  <radialGradient id="bgGrad" cx="50%" cy="40%" r="70%">
+    <stop offset="0%"  stop-color="#1A1A24"/>
+    <stop offset="100%" stop-color="#0A0A0E"/>
+  </radialGradient>
 </defs>
 """
 
 
-# ═══════════════════════════════════════════════════════════════
-#  组件工厂
-# ═══════════════════════════════════════════════════════════════
-
-def make_wallpaper(w: int, h: int) -> str:
-    """macOS 风格彩色壁纸背景：大色块光斑 + 深色底 + 微粒纹理。"""
-    return f"""
-  <!-- 深色底 -->
-  <rect width="{w}" height="{h}" fill="url(#wallpaperBase)"/>
-  <!-- 彩色光斑（大模糊，模拟渐变网格） -->
-  <ellipse cx="{w*0.15}" cy="{h*0.20}" rx="{w*0.35}" ry="{h*0.35}" fill="url(#blobPurple)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="{w*0.85}" cy="{h*0.15}" rx="{w*0.30}" ry="{h*0.30}" fill="url(#blobPink)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="{w*0.80}" cy="{h*0.80}" rx="{w*0.35}" ry="{h*0.35}" fill="url(#blobOrange)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="{w*0.20}" cy="{h*0.85}" rx="{w*0.30}" ry="{h*0.30}" fill="url(#blobBlue)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="{w*0.50}" cy="{h*0.50}" rx="{w*0.25}" ry="{h*0.25}" fill="url(#blobMint)" filter="url(#glassBlurLg)"/>
-  <!-- 微粒噪点（模拟壁纸纹理） -->
-  <rect width="{w}" height="{h}" fill="url(#wallpaperBase)" opacity="0.15"/>
-"""
+def make_bg(w: int, h: int) -> str:
+    return f'<rect width="{w}" height="{h}" fill="url(#bgGrad)"/>'
 
 
-def glass_panel(x: float, y: float, w: float, h: float, r: float = 20,
-                blur_bg: bool = True, shadow: bool = True) -> str:
-    """真实液态玻璃面板：背景模糊 + 半透明 + 顶部高光 + 镜面边框 + 投影。"""
-    parts = []
-    filt = ' filter="url(#dropShadow)"' if shadow else ''
-    clip_id = f"clip_{int(x)}_{int(y)}_{int(w)}_{int(h)}"
-    parts.append(f"""
-  <!-- 玻璃面板 @({x:.0f},{y:.0f}) {w:.0f}x{h:.0f} -->
-  <defs>
-    <clipPath id="{clip_id}">
-      <rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}"/>
-    </clipPath>
-  </defs>
-  <g{filt}>""")
-    if blur_bg:
-        # 模糊背景层（透过玻璃看到的彩色背景）
-        parts.append(f"""
-    <g clip-path="url(#{clip_id})">
-      <!-- 模糊的彩色背景 -->
-      <rect x="{x}" y="{y}" width="{w}" height="{h}" fill="url(#wallpaperBase)"/>
-      <ellipse cx="{x+w*0.2}" cy="{y+h*0.3}" rx="{w*0.4}" ry="{h*0.4}" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
-      <ellipse cx="{x+w*0.8}" cy="{y+h*0.7}" rx="{w*0.35}" ry="{h*0.35}" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
-      <!-- 玻璃半透明叠层 -->
-      <rect x="{x}" y="{y}" width="{w}" height="{h}" fill="url(#glassFill)"/>
-      <!-- 顶部镜面高光 -->
-      <rect x="{x}" y="{y}" width="{w}" height="{h*0.5}" rx="{r}" fill="url(#glassHighlight)"/>
-    </g>""")
-    else:
-        parts.append(f"""
-    <rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}" fill="url(#glassFill)"/>
-    <rect x="{x}" y="{y}" width="{w}" height="{h*0.4}" rx="{r}" fill="url(#glassHighlight)"/>""")
-    # 边框（双层：外亮内暗）
-    parts.append(f"""
-    <rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="{x+1.5}" y="{y+1.5}" width="{w-3}" height="{h-3}" rx="{r-1.5}" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>""")
+def laser_dot(x: float, y: float, color: str = C_LASER, r: float = 1.5) -> str:
+    """单个激光点：外圈光晕 + 中心白核。"""
+    return f'''<circle cx="{x}" cy="{y}" r="{r*3}" fill="{color}" opacity="0.3" filter="url(#laserGlow)"/>
+<circle cx="{x}" cy="{y}" r="{r}" fill="#ffffff" filter="url(#laserGlowSm)"/>'''
+
+
+def face_mesh_dots(cx: float, cy: float, scale: float = 1,
+                   color: str = C_LASER, w: float = 200, h: float = 220) -> str:
+    """生成面部轮廓 + 五官的激光点阵（模拟 OpenCV 实时渲染）。
+
+    基于 5 landmarks 位置插值生成密集点阵，模拟实时跟随效果。
+    """
+    dots = []
+    # 5 landmarks 基准位置（相对人脸中心）
+    le = (cx - 35*scale, cy - 15*scale)   # 左眼
+    re = (cx + 35*scale, cy - 15*scale)   # 右眼
+    nose = (cx, cy + 15*scale)            # 鼻
+    rm = (cx - 25*scale, cy + 45*scale)   # 右嘴角
+    lm_ = (cx + 25*scale, cy + 45*scale)  # 左嘴角
+    eye_dist = 70 * scale
+
+    # 1. 面部外轮廓（椭圆点阵）
+    rx, ry = w*0.42, h*0.48
+    for ang in range(0, 360, 6):
+        a = math.radians(ang)
+        px = cx + rx * math.cos(a)
+        py = cy + ry * math.sin(a) + h*0.02
+        dots.append(laser_dot(px, py, color, 1.2))
+
+    # 2. 左眼轮廓（椭圆点阵）
+    erx, ery = eye_dist*0.18, eye_dist*0.12
+    for ang in range(0, 360, 15):
+        a = math.radians(ang)
+        dots.append(laser_dot(le[0]+erx*math.cos(a), le[1]+ery*math.sin(a), color, 1.5))
+    # 3. 右眼轮廓
+    for ang in range(0, 360, 15):
+        a = math.radians(ang)
+        dots.append(laser_dot(re[0]+erx*math.cos(a), re[1]+ery*math.sin(a), color, 1.5))
+    # 瞳孔
+    dots.append(laser_dot(le[0], le[1], color, 2))
+    dots.append(laser_dot(re[0], re[1], color, 2))
+
+    # 4. 眉毛（弧线点阵）
+    brow_off = eye_dist * 0.22
+    for eye in (le, re):
+        for t in range(-4, 5):
+            x = eye[0] + t * eye_dist * 0.05
+            y = eye[1] - brow_off + abs(t) * eye_dist * 0.015
+            dots.append(laser_dot(x, y, color, 1.3))
+
+    # 5. 鼻梁（竖线点阵）
+    brow_c = ((le[0]+re[0])/2, (le[1]+re[1])/2 - eye_dist*0.05)
+    for t in range(0, 11):
+        r = t / 10
+        x = brow_c[0]*(1-r) + nose[0]*r
+        y = brow_c[1]*(1-r) + nose[1]*r
+        dots.append(laser_dot(x, y, color, 1.2))
+    # 鼻翼
+    for ang in range(-60, 61, 20):
+        a = math.radians(ang + 90)
+        nw = eye_dist * 0.10
+        dots.append(laser_dot(nose[0]+nw*math.cos(a), nose[1]+nw*math.sin(a), color, 1.2))
+
+    # 6. 嘴唇（椭圆点阵）
+    mouth_cx = (rm[0]+lm_[0])/2
+    mouth_cy = (rm[1]+lm_[1])/2
+    mrx = abs(lm_[0]-rm[0])/2 + eye_dist*0.04
+    mry = eye_dist * 0.06
+    for ang in range(0, 360, 12):
+        a = math.radians(ang)
+        dots.append(laser_dot(mouth_cx+mrx*math.cos(a), mouth_cy+mry*math.sin(a), color, 1.3))
+    # 嘴唇中线
+    for t in range(-5, 6):
+        dots.append(laser_dot(mouth_cx+t*mrx*0.18, mouth_cy, color, 1.2))
+
+    return "\n".join(dots)
+
+
+def face_box(x: float, y: float, w: float, h: float, color: str) -> str:
+    """简洁人脸框：细线矩形 + 四角标记。"""
+    cl = max(12, min(w, h) / 6)
+    parts = [f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="none" stroke="{color}" stroke-width="1" opacity="0.7"/>']
+    # 四角
+    corners = [
+        (x, y, cl, 0), (x, y, 0, cl),
+        (x+w, y, -cl, 0), (x+w, y, 0, cl),
+        (x, y+h, cl, 0), (x, y+h, 0, -cl),
+        (x+w, y+h, -cl, 0), (x+w, y+h, 0, -cl),
+    ]
+    for cx, cy, dx, dy in corners:
+        parts.append(f'<line x1="{cx}" y1="{cy}" x2="{cx+dx}" y2="{cy+dy}" stroke="{color}" stroke-width="2.5" stroke-linecap="round"/>')
     return "\n".join(parts)
 
 
-def text(x: float, y: float, content: str, size: float = 14, weight: int = 400,
-         color: str = T_PRIMARY, opacity: float = 1.0, anchor: str = "start",
-         spacing: float = 0, shadow: bool = False) -> str:
-    """SF Pro 风格文字（思源黑体 SC，数字字重 200-900）。"""
-    ls = f' letter-spacing="{spacing}"' if spacing else ""
-    filt = ' filter="url(#txtShadow)"' if shadow else ""
-    return f'<text x="{x}" y="{y}" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="{size}" font-weight="{weight}" fill="{color}" fill-opacity="{opacity}" text-anchor="{anchor}"{ls}{filt}>{content}</text>'
+def label_pill(x: float, y: float, text: str, color: str) -> str:
+    """简洁标签：半透明黑底 + 左侧色条 + 文字。"""
+    w = 12 + len(text) * 7.2
+    h = 22
+    return f'''<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="3" fill="{C_BG}" opacity="0.75"/>
+<rect x="{x}" y="{y}" width="3" height="{h}" fill="{color}"/>
+<text x="{x+10}" y="{y+15}" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="{color}">{text}</text>'''
 
 
-_halo_counter = [0]
+def top_bar(status: str, color: str) -> str:
+    return f'''<circle cx="14" cy="20" r="3" fill="{color}"/>
+<text x="24" y="25" font-family="Source Han Sans SC, sans-serif" font-size="13" font-weight="600" fill="{C_WHITE}">FaceGuard</text>
+<text x="100" y="25" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="{C_TEXT_DIM}">{status}</text>'''
 
 
-def halo(cx: float, cy: float, r: float, color: str, opacity: float = 0.6) -> str:
-    """呼吸光晕（径向渐变）。每次调用生成唯一 ID 避免冲突。"""
-    _halo_counter[0] += 1
-    gid = f"halo_{_halo_counter[0]}"
-    return f"""
-  <defs>
-    <radialGradient id="{gid}" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"  stop-color="{color}" stop-opacity="{opacity}"/>
-      <stop offset="40%" stop-color="{color}" stop-opacity="{opacity*0.4}"/>
-      <stop offset="100%" stop-color="{color}" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <circle cx="{cx}" cy="{cy}" r="{r}" fill="url(#{gid})" filter="url(#bloomStrong)"/>"""
+def status_bar(w: int, h: int, status: str, color: str) -> str:
+    bar_h = 30
+    y = h - bar_h
+    return f'''<rect x="0" y="{y}" width="{w}" height="{bar_h}" fill="{C_BG}" opacity="0.8"/>
+<circle cx="16" cy="{y+bar_h//2}" r="3" fill="{color}"/>
+<text x="28" y="{y+bar_h//2+5}" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="500" fill="{C_WHITE}">{status}</text>'''
 
 
-def pulse_ring(cx: float, cy: float, r: float, color: str, width: float = 2) -> str:
-    """脉冲环（多层渐隐圆环，模拟动画扩散）。"""
-    rings = []
-    for i, (offset, op) in enumerate([(0, 0.9), (8, 0.5), (18, 0.25), (30, 0.1)]):
-        rings.append(
-            f'<circle cx="{cx}" cy="{cy}" r="{r+offset}" fill="none" '
-            f'stroke="{color}" stroke-width="{width}" stroke-opacity="{op}" '
-            f'filter="url(#softGlow)"/>'
-        )
-    return "\n".join(rings)
-
-
-def scan_line(x: float, y: float, w: float, h: float, color: str = C_MINT_LT,
-              pos: float = 0.4) -> str:
-    """扫描线 + 泛光带（模拟动画中一帧）。"""
-    ly = y + h * pos
-    return f"""
-  <!-- 扫描线泛光带 -->
-  <rect x="{x}" y="{y}" width="{w}" height="{h}" fill="none"/>
-  <rect x="{x}" y="{ly-20}" width="{w}" height="40" fill="{color}" opacity="0.08" filter="url(#glassBlur)"/>
-  <rect x="{x}" y="{ly-8}" width="{w}" height="16" fill="{color}" opacity="0.2" filter="url(#glassBlurSm)"/>
-  <!-- 主扫描线 -->
-  <rect x="{x}" y="{ly-1}" width="{w}" height="2" fill="{color}" filter="url(#bloom)"/>"""
-
-
-def face_landmarks(cx: float, cy: float, scale: float = 1, color: str = C_MINT_LT) -> str:
-    """发光关键点 + 连线（5点：双眼/鼻/嘴角）。"""
-    pts = {
-        "re": (cx - 30*scale, cy - 15*scale),
-        "le": (cx + 30*scale, cy - 15*scale),
-        "n":  (cx,             cy + 5*scale),
-        "rm": (cx - 22*scale, cy + 35*scale),
-        "lm": (cx + 22*scale, cy + 35*scale),
-    }
-    parts = ["<!-- 关键点连线 -->"]
-    pairs = [("re","le"),("le","n"),("n","rm"),("n","lm"),("rm","lm")]
-    for a, b in pairs:
-        parts.append(f'<line x1="{pts[a][0]}" y1="{pts[a][1]}" x2="{pts[b][0]}" y2="{pts[b][1]}" '
-                     f'stroke="{color}" stroke-width="1" stroke-opacity="0.35"/>')
-    parts.append("<!-- 发光关键点 -->")
-    for name, (px, py) in pts.items():
-        parts.append(f'<circle cx="{px}" cy="{py}" r="8" fill="{color}" opacity="0.25" filter="url(#bloom)"/>')
-        parts.append(f'<circle cx="{px}" cy="{py}" r="3" fill="#ffffff" filter="url(#softGlow)"/>')
-    return "\n".join(parts)
-
-
-def toggle_switch(x: float, y: float, on: bool, color: str = C_MINT) -> str:
-    """iOS 风格液态玻璃开关。"""
-    if on:
-        track_fill = color
-        knob_cx = x + 26
-    else:
-        track_fill = "rgba(120,120,128,0.32)"
-        knob_cx = x + 4
-    return f"""
-  <rect x="{x}" y="{y}" width="50" height="30" rx="15" fill="{track_fill}" opacity="0.85" filter="url(#dropShadowSm)"/>
-  <circle cx="{knob_cx}" cy="{y+15}" r="12" fill="#ffffff" filter="url(#softGlow)"/>"""
-
-
-def progress_bar(x: float, y: float, w: float, h: float, pct: float,
-                 color: str = C_MINT) -> str:
-    """液态进度条。"""
-    fill_w = w * pct / 100
-    gid = f"pg_{int(x)}_{int(y)}"
-    return f"""
-  <defs>
-    <linearGradient id="{gid}" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%"  stop-color="{color}" stop-opacity="0.7"/>
-      <stop offset="100%" stop-color="{color}" stop-opacity="1"/>
-    </linearGradient>
-  </defs>
-  <rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{h/2}" fill="rgba(255,255,255,0.1)"/>
-  <rect x="{x}" y="{y}" width="{fill_w}" height="{h}" rx="{h/2}" fill="url(#{gid})" filter="url(#bloom)"/>"""
-
-
-def sparkle(cx: float, cy: float, r: float = 3, color: str = "#ffffff") -> str:
-    """四角星粒子（闪烁效果）。"""
-    return f'<path d="M{cx},{cy-r} L{cx+r*0.3},{cy-r*0.3} L{cx+r},{cy} L{cx+r*0.3},{cy+r*0.3} L{cx},{cy+r} L{cx-r*0.3},{cy+r*0.3} L{cx-r},{cy} L{cx-r*0.3},{cy-r*0.3} Z" fill="{color}" opacity="0.7" filter="url(#softGlow)"/>'
-
-
-def face_silhouette(cx: float, cy: float, scale: float = 1, color: str = "#2A2A3E") -> str:
-    """人脸剪影（头+肩轮廓）。"""
-    return f"""
-  <ellipse cx="{cx}" cy="{cy-30*scale}" rx="{55*scale}" ry="{70*scale}" fill="{color}" opacity="0.7"/>
-  <path d="M{cx-75*scale},{cy+80*scale} Q{cx-75*scale},{cy+20*scale} {cx},{cy+20*scale} Q{cx+75*scale},{cy+20*scale} {cx+75*scale},{cy+80*scale} Z" fill="{color}" opacity="0.7"/>"""
-
-
-def status_pill(x: float, y: float, w: float, h: float, dot_color: str,
-                label: str, sublabel: str = "", sub_color: str = "") -> str:
-    """顶部状态胶囊。"""
-    parts = [glass_panel(x, y, w, h, r=h/2, shadow=False)]
-    parts.append(f'<circle cx="{x+h/2}" cy="{y+h/2}" r="5" fill="{dot_color}" filter="url(#bloom)"/>')
-    parts.append(f'<circle cx="{x+h/2}" cy="{y+h/2}" r="10" fill="{dot_color}" opacity="0.25" filter="url(#bloom)"/>')
-    parts.append(text(x + h/2 + 14, y + h/2 + 5, label, 14, 700, T_ON_GLASS, shadow=True))
-    if sublabel:
-        sc = sub_color or dot_color
-        parts.append(text(x + h/2 + 14 + len(label)*12, y + h/2 + 5, f"· {sublabel}", 11, 500, sc))
-    return "\n".join(parts)
-
-
-def render_svg(svg_content: str, filename: str, w: int, h: int) -> bool:
-    """生成 SVG + 渲染 PNG @ 2x。"""
+def render_svg(content: str, filename: str, w: int, h: int) -> bool:
     svg = f'''<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">
 {SVG_DEFS}
-{make_wallpaper(w, h)}
-{svg_content}
+{make_bg(w, h)}
+{content}
 </svg>'''
     svg_path = OUT / f"{filename}.svg"
     svg_path.write_text(svg, encoding="utf-8")
     png_path = OUT / f"{filename}.png"
     try:
-        cairosvg.svg2png(
-            bytestring=svg.encode("utf-8"),
-            write_to=str(png_path),
-            output_width=w * 2,
-            output_height=h * 2,
-        )
+        cairosvg.svg2png(bytestring=svg.encode("utf-8"),
+                         write_to=str(png_path),
+                         output_width=w*2, output_height=h*2)
         return True
     except Exception as e:
         print(f"  渲染失败 {filename}: {e}")
         return False
 
 
+def scan_line(x, y, w, h, color, pos=0.4):
+    ly = y + h * pos
+    return f'''<rect x="{x}" y="{ly-6}" width="{w}" height="12" fill="{color}" opacity="0.15" filter="url(#scanGlow)"/>
+<rect x="{x}" y="{ly-0.5}" width="{w}" height="1" fill="{color}"/>'''
+
+
 # ═══════════════════════════════════════════════════════════════
-#  8 个核心界面
+#  8 个界面
 # ═══════════════════════════════════════════════════════════════
 
-def shot_01_recognize_owner() -> bool:
-    """识别本人成功：绿色呼吸光晕 + 流光人脸框 + 脉冲环。"""
+def shot_01_owner():
     W, H = 800, 600
-    cx, cy = 400, 270
-    content = f"""
-  <!-- 摄像头画面暗框 -->
-  <rect x="30" y="30" width="{W-60}" height="{H-60}" rx="28" fill="#000000" opacity="0.25" filter="url(#dropShadow)"/>
+    cx, cy = 400, 290
+    fw, fh = 220, 240
+    content = f'''
+  <!-- 人脸剪影（暗色，让点阵更突出） -->
+  <ellipse cx="{cx}" cy="{cy-30}" rx="55" ry="70" fill="#1A1A24" opacity="0.8"/>
+  <path d="M{cx-75},{cy+80} Q{cx-75},{cy+20} {cx},{cy+20} Q{cx+75},{cy+20} {cx+75},{cy+80} Z" fill="#1A1A24" opacity="0.8"/>
 
-  <!-- 人脸剪影 -->
-  {face_silhouette(cx, cy, 1.3, "#3A3A5C")}
+  <!-- 蓝色激光点阵（核心可视化） -->
+  {face_mesh_dots(cx, cy, 1.0, C_LASER, fw, fh)}
 
-  <!-- 呼吸光晕（薄荷绿） -->
-  {halo(cx, cy-10, 200, C_MINT, 0.5)}
+  <!-- 简洁人脸框 -->
+  {face_box(cx-fw//2, cy-fh//2-10, fw, fh, C_LASER)}
 
-  <!-- 脉冲环（3层扩散，模拟动画） -->
-  {pulse_ring(cx, cy-10, 130, C_MINT, 2.5)}
-  {pulse_ring(cx, cy-10, 100, C_MINT_LT, 2)}
+  <!-- 标签 -->
+  {label_pill(cx-fw//2, cy-fh//2-36, "Owner  0.99", C_LASER)}
 
-  <!-- 流光人脸框（圆角 + 彩虹边框 + 高光） -->
-  <rect x="{cx-110}" y="{cy-130}" width="220" height="230" rx="22" fill="none"
-        stroke="url(#rainbowBorder)" stroke-width="3" filter="url(#bloom)"/>
-  <rect x="{cx-110}" y="{cy-130}" width="220" height="230" rx="22" fill="none"
-        stroke="#ffffff" stroke-width="1" stroke-opacity="0.5"/>
-
-  <!-- 关键点 -->
-  {face_landmarks(cx, cy-10, 1.3, C_MINT_LT)}
-
-  <!-- 四角装饰角标 -->
-  <path d="M{cx-120},{cy-120} L{cx-120},{cy-105} M{cx-120},{cy-120} L{cx-105},{cy-120}" stroke="{C_MINT}" stroke-width="3" stroke-linecap="round" filter="url(#bloom)"/>
-  <path d="M{cx+120},{cy-120} L{cx+120},{cy-105} M{cx+120},{cy-120} L{cx+105},{cy-120}" stroke="{C_MINT}" stroke-width="3" stroke-linecap="round" filter="url(#bloom)"/>
-  <path d="M{cx-120},{cy+120} L{cx-120},{cy+105} M{cx-120},{cy+120} L{cx-105},{cy+120}" stroke="{C_MINT}" stroke-width="3" stroke-linecap="round" filter="url(#bloom)"/>
-  <path d="M{cx+120},{cy+120} L{cx+120},{cy+105} M{cx+120},{cy+120} L{cx+105},{cy+120}" stroke="{C_MINT}" stroke-width="3" stroke-linecap="round" filter="url(#bloom)"/>
-
-  <!-- 顶部状态胶囊 -->
-  {glass_panel(30, 40, 300, 52, 26)}
-  <circle cx="56" cy="66" r="6" fill="{C_MINT}" filter="url(#bloom)"/>
-  <circle cx="56" cy="66" r="12" fill="{C_MINT}" opacity="0.25"/>
-  {text(72, 71, "FaceGuard", 17, 700, T_ON_GLASS, shadow=True)}
-  {text(186, 71, "已激活", 12, 500, C_MINT_LT)}
-
-  <!-- 右上角置信度 -->
-  {glass_panel(570, 40, 200, 52, 26)}
-  {text(590, 71, "置信度", 12, 500, T_SECONDARY)}
-  {text(700, 71, "99.2%", 17, 700, C_MINT, anchor="end", shadow=True)}
+  <!-- 顶部状态 -->
+  {top_bar("Active · 已识别", C_LASER)}
 
   <!-- 底部状态栏 -->
-  {glass_panel(30, H-80, W-60, 50, 18)}
-  <circle cx="58" cy="{H-55}" r="5" fill="{C_MINT}" filter="url(#bloom)"/>
-  {text(74, H-50, "✓ 识别成功 · 已解锁", 15, 700, C_MINT_LT, shadow=True)}
-  {text(W-50, H-50, "FaceGuard v2.1", 11, 400, T_HINT, anchor="end")}
-
-  <!-- 粒子闪烁 -->
-  {sparkle(180, 200, 4, C_MINT_LT)}
-  {sparkle(620, 180, 3, C_MINT_LT)}
-  {sparkle(150, 400, 3, "#ffffff")}
-  {sparkle(650, 420, 4, C_MINT_LT)}
-  {sparkle(580, 300, 2, "#ffffff")}"""
+  {status_bar(W, H, "✓ 识别成功 · 已解锁", C_LASER)}'''
     return render_svg(content, "01_recognize_owner", W, H)
 
 
-def shot_02_recognize_stranger() -> bool:
-    """识别陌生人失败：红色警告光晕 + 警告框。"""
+def shot_02_stranger():
     W, H = 800, 600
-    cx, cy = 400, 270
-    content = f"""
-  <rect x="30" y="30" width="{W-60}" height="{H-60}" rx="28" fill="#000000" opacity="0.25" filter="url(#dropShadow)"/>
-  {face_silhouette(cx, cy, 1.3, "#5C2A2A")}
+    cx, cy = 400, 290
+    fw, fh = 220, 240
+    content = f'''
+  <ellipse cx="{cx}" cy="{cy-30}" rx="55" ry="70" fill="#241A1A" opacity="0.8"/>
+  <path d="M{cx-75},{cy+80} Q{cx-75},{cy+20} {cx},{cy+20} Q{cx+75},{cy+20} {cx+75},{cy+80} Z" fill="#241A1A" opacity="0.8"/>
 
-  <!-- 警告光晕（珊瑚红） -->
-  {halo(cx, cy-10, 200, C_CORAL, 0.5)}
-  {pulse_ring(cx, cy-10, 130, C_CORAL, 2.5)}
+  <!-- 红色激光点阵（陌生人） -->
+  {face_mesh_dots(cx, cy, 1.0, C_RED, fw, fh)}
 
-  <!-- 人脸框（红色警告） -->
-  <rect x="{cx-110}" y="{cy-130}" width="220" height="230" rx="22" fill="none"
-        stroke="{C_CORAL}" stroke-width="3" filter="url(#bloom)"/>
-  <rect x="{cx-110}" y="{cy-130}" width="220" height="230" rx="22" fill="none"
-        stroke="{C_CORAL_LT}" stroke-width="1" stroke-opacity="0.5"/>
+  {face_box(cx-fw//2, cy-fh//2-10, fw, fh, C_RED)}
+  {label_pill(cx-fw//2, cy-fh//2-36, "Unknown  0.12", C_RED)}
 
-  {face_landmarks(cx, cy-10, 1.3, C_CORAL_LT)}
+  <!-- 扫描线 -->
+  {scan_line(cx-fw//2, cy-fh//2-10, fw, fh, C_RED, 0.45)}
 
-  <!-- 警告角标 -->
-  <path d="M{cx-120},{cy-120} L{cx-120},{cy-105} M{cx-120},{cy-120} L{cx-105},{cy-120}" stroke="{C_CORAL}" stroke-width="3" stroke-linecap="round" filter="url(#bloom)"/>
-  <path d="M{cx+120},{cy-120} L{cx+120},{cy-105} M{cx+120},{cy-120} L{cx+105},{cy-120}" stroke="{C_CORAL}" stroke-width="3" stroke-linecap="round" filter="url(#bloom)"/>
-  <path d="M{cx-120},{cy+120} L{cx-120},{cy+105} M{cx-120},{cy+120} L{cx-105},{cy+120}" stroke="{C_CORAL}" stroke-width="3" stroke-linecap="round" filter="url(#bloom)"/>
-  <path d="M{cx+120},{cy+120} L{cx+120},{cy+105} M{cx+120},{cy+120} L{cx+105},{cy+120}" stroke="{C_CORAL}" stroke-width="3" stroke-linecap="round" filter="url(#bloom)"/>
-
-  <!-- 顶部状态 -->
-  {glass_panel(30, 40, 300, 52, 26)}
-  <circle cx="56" cy="66" r="6" fill="{C_CORAL}" filter="url(#bloom)"/>
-  <circle cx="56" cy="66" r="12" fill="{C_CORAL}" opacity="0.25"/>
-  {text(72, 71, "FaceGuard", 17, 700, T_ON_GLASS, shadow=True)}
-  {text(186, 71, "警告", 12, 500, C_CORAL_LT)}
-
-  <!-- 右上角抓拍状态 -->
-  {glass_panel(540, 40, 230, 52, 26)}
-  {text(560, 71, "已抓拍 #2", 12, 500, C_AMBER_LT)}
-  {text(750, 71, "邮件已发送", 11, 500, C_MINT_LT, anchor="end")}
-
-  <!-- 底部状态 -->
-  {glass_panel(30, H-80, W-60, 50, 18)}
-  <circle cx="58" cy="{H-55}" r="5" fill="{C_CORAL}" filter="url(#bloom)"/>
-  {text(74, H-50, "✕ 识别失败 · 已抓拍并发送告警邮件", 15, 700, C_CORAL_LT, shadow=True)}
-  {text(W-50, H-50, "陌生人 · 相似度 12%", 11, 400, T_HINT, anchor="end")}
-
-  {sparkle(180, 200, 4, C_CORAL_LT)}
-  {sparkle(620, 180, 3, C_CORAL_LT)}"""
+  {top_bar("Alert · 陌生人", C_RED)}
+  {status_bar(W, H, "✕ 识别失败 · 已抓拍并告警", C_RED)}'''
     return render_svg(content, "02_recognize_stranger", W, H)
 
 
-def shot_03_guardian_intruder() -> bool:
-    """身后入侵守护：双人脸（本人安全 + 入侵者警告）。"""
+def shot_03_guardian():
     W, H = 800, 600
-    content = f"""
-  <rect x="30" y="30" width="{W-60}" height="{H-60}" rx="28" fill="#000000" opacity="0.25" filter="url(#dropShadow)"/>
+    content = f'''
+  <!-- 本人（左，蓝） -->
+  <ellipse cx="250" cy="260" rx="42" ry="55" fill="#1A1A24" opacity="0.8"/>
+  <path d="M195,340 Q195,290 250,290 Q305,290 305,340 Z" fill="#1A1A24" opacity="0.8"/>
+  {face_mesh_dots(250, 290, 0.85, C_LASER, 170, 180)}
+  {face_box(165, 200, 170, 180, C_LASER)}
+  {label_pill(165, 178, "Owner", C_LASER)}
 
-  <!-- 本人（左侧，安全） -->
-  {face_silhouette(250, 290, 1.0, "#3A3A5C")}
-  {halo(250, 270, 120, C_MINT, 0.4)}
-  {pulse_ring(250, 270, 80, C_MINT, 2)}
-  <rect x="170" y="190" width="160" height="170" rx="18" fill="none" stroke="{C_MINT}" stroke-width="2.5" filter="url(#bloom)"/>
-  {face_landmarks(250, 270, 1.0, C_MINT_LT)}
+  <!-- 入侵者（右，红） -->
+  <ellipse cx="560" cy="240" rx="45" ry="58" fill="#241A1A" opacity="0.8"/>
+  <path d="M500,325 Q500,275 560,275 Q620,275 620,325 Z" fill="#241A1A" opacity="0.8"/>
+  {face_mesh_dots(560, 270, 0.9, C_RED, 180, 190)}
+  {face_box(470, 175, 180, 190, C_RED)}
+  {label_pill(470, 153, "Intruder", C_RED)}
 
-  <!-- 入侵者（右侧，警告） -->
-  {face_silhouette(560, 260, 1.05, "#5C3A1A")}
-  {halo(560, 240, 130, C_AMBER, 0.5)}
-  {pulse_ring(560, 240, 90, C_AMBER, 2.5)}
-  <rect x="475" y="155" width="170" height="180" rx="18" fill="none" stroke="{C_AMBER}" stroke-width="3" filter="url(#bloom)"/>
-  {face_landmarks(560, 240, 1.05, C_AMBER_LT)}
+  <!-- 检测连线 -->
+  <line x1="335" y1="290" x2="470" y2="270" stroke="{C_AMBER}" stroke-width="1" stroke-dasharray="5 3" opacity="0.6"/>
+  <text x="402" y="270" font-family="Source Han Sans SC, sans-serif" font-size="11" font-weight="600" fill="{C_AMBER}" text-anchor="middle">behind</text>
 
-  <!-- 中间连接线（检测关系） -->
-  <line x1="330" y1="280" x2="475" y2="250" stroke="{C_AMBER}" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.5" filter="url(#bloom)"/>
-  {text(400, 250, "身后检测", 12, 700, C_AMBER_LT, anchor="middle", shadow=True)}
-
-  <!-- 顶部状态 -->
-  {glass_panel(30, 40, 300, 52, 26)}
-  <circle cx="56" cy="66" r="6" fill="{C_AMBER}" filter="url(#bloom)"/>
-  {text(72, 71, "FaceGuard", 17, 700, T_ON_GLASS, shadow=True)}
-  {text(186, 71, "守护警告", 12, 500, C_AMBER_LT)}
-
-  {glass_panel(440, 40, 330, 52, 26)}
-  {text(460, 71, "身后出现 1 人", 13, 700, C_AMBER_LT, shadow=True)}
-  {text(750, 71, "已邮件告警", 11, 500, C_MINT_LT, anchor="end")}
-
-  <!-- 底部状态 -->
-  {glass_panel(30, H-80, W-60, 50, 18)}
-  <circle cx="58" cy="{H-55}" r="5" fill="{C_AMBER}" filter="url(#bloom)"/>
-  {text(74, H-50, "⚠ 守护模式 · 检测到身后他人", 15, 700, C_AMBER_LT, shadow=True)}"""
+  {top_bar("Alert · 身后入侵", C_AMBER)}
+  {status_bar(W, H, "⚠ 守护模式 · 检测到身后他人", C_AMBER)}'''
     return render_svg(content, "03_guardian_intruder", W, H)
 
 
-def shot_04_absence() -> bool:
-    """离开锁屏休眠：倒计时 + 进度环。"""
+def shot_04_absence():
     W, H = 800, 600
-    cx, cy = 400, 280
-    content = f"""
-  <rect x="30" y="30" width="{W-60}" height="{H-60}" rx="28" fill="#000000" opacity="0.35" filter="url(#dropShadow)"/>
-
-  <!-- 蓝色光晕 -->
-  {halo(cx, cy, 200, C_BLUE, 0.3)}
-
+    cx, cy = 400, 290
+    content = f'''
   <!-- 大数字倒计时 -->
-  {text(cx, cy-20, "5:00", 96, 200, C_BLUE_LT, anchor="middle", shadow=True)}
-  {text(cx, cy+30, "后进入休眠", 18, 500, T_SECONDARY, anchor="middle")}
+  <text x="{cx}" y="{cy-20}" font-family="Source Han Sans SC, sans-serif" font-size="88" font-weight="200" fill="{C_LASER_LT}" text-anchor="middle">5:00</text>
+  <text x="{cx}" y="{cy+20}" font-family="Source Han Sans SC, sans-serif" font-size="16" font-weight="400" fill="{C_TEXT_DIM}" text-anchor="middle">后进入休眠</text>
 
   <!-- 进度环 -->
-  <circle cx="{cx}" cy="{cy+110}" r="45" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8"/>
-  <circle cx="{cx}" cy="{cy+110}" r="45" fill="none" stroke="{C_BLUE}" stroke-width="8"
-          stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="85"
-          transform="rotate(-90 {cx} {cy+110})" filter="url(#bloom)"/>
+  <circle cx="{cx}" cy="{cy+90}" r="42" fill="none" stroke="#ffffff" stroke-opacity="0.1" stroke-width="6"/>
+  <circle cx="{cx}" cy="{cy+90}" r="42" fill="none" stroke="{C_LASER}" stroke-width="6" stroke-linecap="round"
+          stroke-dasharray="264" stroke-dashoffset="80" transform="rotate(-90 {cx} {cy+90})" filter="url(#laserGlow)"/>
 
-  <!-- 顶部状态 -->
-  {glass_panel(30, 40, 300, 52, 26)}
-  <circle cx="56" cy="66" r="6" fill="{C_BLUE}" filter="url(#bloom)"/>
-  {text(72, 71, "FaceGuard", 17, 700, T_ON_GLASS, shadow=True)}
-  {text(186, 71, "离开模式", 12, 500, C_BLUE_LT)}
-
-  {glass_panel(500, 40, 270, 52, 26)}
-  {text(520, 71, "已锁屏 · 等待休眠", 13, 500, C_BLUE_LT, shadow=True)}
-
-  <!-- 底部状态 -->
-  {glass_panel(30, H-80, W-60, 50, 18)}
-  <circle cx="58" cy="{H-55}" r="5" fill="{C_BLUE}" filter="url(#bloom)"/>
-  {text(74, H-50, "用户已离开 · 已锁屏 · 5 分钟后休眠", 15, 700, C_BLUE_LT, shadow=True)}
-
-  {sparkle(200, 150, 3, C_BLUE_LT)}
-  {sparkle(600, 130, 4, C_BLUE_LT)}
-  {sparkle(150, 450, 3, "#ffffff")}"""
+  {top_bar("Away · 离开模式", C_LASER)}
+  {status_bar(W, H, "用户已离开 · 已锁屏 · 5 分钟后休眠", C_LASER)}'''
     return render_svg(content, "04_absence", W, H)
 
 
-def shot_05_recognizing() -> bool:
-    """多帧确认中：扫描线 + 进度。"""
+def shot_05_recognizing():
     W, H = 800, 600
-    cx, cy = 270, 260
-    content = f"""
-  <rect x="30" y="30" width="{W-60}" height="{H-60}" rx="28" fill="#000000" opacity="0.25" filter="url(#dropShadow)"/>
-  {face_silhouette(cx, cy, 1.3, "#3A3A5C")}
+    cx, cy = 270, 290
+    fw, fh = 220, 240
+    content = f'''
+  <ellipse cx="{cx}" cy="{cy-30}" rx="55" ry="70" fill="#1A1A24" opacity="0.8"/>
+  <path d="M{cx-75},{cy+80} Q{cx-75},{cy+20} {cx},{cy+20} Q{cx+75},{cy+20} {cx+75},{cy+80} Z" fill="#1A1A24" opacity="0.8"/>
 
-  <!-- 扫描中光晕 -->
-  {halo(cx, cy-10, 160, C_MINT_LT, 0.35)}
+  <!-- 蓝色激光点阵 -->
+  {face_mesh_dots(cx, cy, 1.0, C_LASER_LT, fw, fh)}
 
-  <!-- 人脸框（虚线，扫描中） -->
-  <rect x="{cx-110}" y="{cy-130}" width="220" height="230" rx="22" fill="none"
-        stroke="{C_MINT_LT}" stroke-width="2" stroke-dasharray="10 6" opacity="0.8" filter="url(#bloom)"/>
+  <!-- 虚线人脸框（扫描中） -->
+  <rect x="{cx-fw//2}" y="{cy-fh//2-10}" width="{fw}" height="{fh}" fill="none" stroke="{C_LASER_LT}" stroke-width="1" stroke-dasharray="8 5" opacity="0.7"/>
 
   <!-- 扫描线 -->
-  {scan_line(cx-110, cy-130, 220, 230, C_MINT_LT, 0.45)}
+  {scan_line(cx-fw//2, cy-fh//2-10, fw, fh, C_LASER_LT, 0.4)}
 
-  {face_landmarks(cx, cy-10, 1.3, C_MINT_LT)}
+  <!-- 右侧进度面板（简洁） -->
+  <text x="500" y="180" font-family="Source Han Sans SC, sans-serif" font-size="16" font-weight="600" fill="{C_WHITE}">正在识别</text>
+  <text x="500" y="205" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="{C_TEXT_DIM}">多帧确认确保安全</text>
 
-  <!-- 右侧识别面板 -->
-  {glass_panel(460, 150, 310, 280, 22)}
-  {text(490, 195, "正在识别", 18, 700, T_PRIMARY, shadow=True)}
-  {text(490, 220, "多帧确认确保安全", 12, 400, T_SECONDARY)}
+  <text x="500" y="245" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="{C_TEXT_DIM}">多帧确认</text>
+  <rect x="500" y="253" width="240" height="6" rx="3" fill="#ffffff" opacity="0.1"/>
+  <rect x="500" y="253" width="161" height="6" rx="3" fill="{C_LASER_LT}" filter="url(#laserGlow)"/>
+  <text x="740" y="245" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="{C_LASER_LT}" text-anchor="end">2/3</text>
 
-  <!-- 帧确认进度 -->
-  {text(490, 260, "多帧确认", 13, 500, T_SECONDARY)}
-  {progress_bar(490, 270, 250, 8, 67, C_MINT_LT)}
-  {text(740, 260, "2/3", 13, 700, C_MINT_LT, anchor="end")}
+  <text x="500" y="290" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="{C_TEXT_DIM}">特征提取</text>
+  <rect x="500" y="298" width="240" height="6" rx="3" fill="#ffffff" opacity="0.1"/>
+  <rect x="500" y="298" width="204" height="6" rx="3" fill="{C_LASER_LT}" filter="url(#laserGlow)"/>
+  <text x="740" y="290" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="{C_LASER_LT}" text-anchor="end">85%</text>
 
-  <!-- 特征提取状态 -->
-  {text(490, 305, "特征提取", 13, 500, T_SECONDARY)}
-  {progress_bar(490, 315, 250, 8, 85, C_BLUE_LT)}
-  {text(740, 305, "85%", 13, 700, C_BLUE_LT, anchor="end")}
+  <text x="500" y="335" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="{C_TEXT_DIM}">活体检测</text>
+  <rect x="500" y="343" width="240" height="6" rx="3" fill="#ffffff" opacity="0.1"/>
+  <rect x="500" y="343" width="221" height="6" rx="3" fill="{C_LASER_LT}" filter="url(#laserGlow)"/>
+  <text x="740" y="335" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="{C_LASER_LT}" text-anchor="end">92%</text>
 
-  <!-- 活体检测 -->
-  {text(490, 350, "活体检测", 13, 500, T_SECONDARY)}
-  {progress_bar(490, 360, 250, 8, 92, C_PURPLE_LT)}
-  {text(740, 350, "92%", 13, 700, C_PURPLE_LT, anchor="end")}
-
-  <!-- 模型信息 -->
-  {glass_panel(480, 390, 270, 28, 14, blur_bg=False, shadow=False)}
-  {text(494, 408, "YuNet + SFace", 11, 500, T_SECONDARY)}
-
-  <!-- 顶部状态 -->
-  {glass_panel(30, 40, 300, 52, 26)}
-  <circle cx="56" cy="66" r="6" fill="{C_MINT_LT}" filter="url(#bloom)"/>
-  {text(72, 71, "FaceGuard", 17, 700, T_ON_GLASS, shadow=True)}
-  {text(186, 71, "识别中", 12, 500, C_MINT_LT)}
-
-  <!-- 底部状态 -->
-  {glass_panel(30, H-80, W-60, 50, 18)}
-  <circle cx="58" cy="{H-55}" r="5" fill="{C_MINT_LT}" filter="url(#bloom)"/>
-  {text(74, H-50, "◌ 识别中 · 多帧确认 2/3", 15, 700, C_MINT_LT, shadow=True)}"""
+  {top_bar("Scanning · 识别中", C_LASER_LT)}
+  {status_bar(W, H, "◌ 识别中 · 多帧确认 2/3", C_LASER_LT)}'''
     return render_svg(content, "05_recognizing", W, H)
 
 
-def shot_06_settings() -> bool:
-    """设置面板：液态玻璃 + 模型选择 + 自适应学习 + 邮件 + 离开。"""
-    W, H = 900, 1180
-    y = 0
-    sections = []
-
+def shot_06_settings():
+    W, H = 900, 1080
+    y = 50
+    parts = []
     # 标题
-    sections.append(f"""
-  <!-- 标题区 -->
-  {halo(80, 70, 50, C_MINT, 0.3)}
-  {text(60, 70, "FaceGuard", 38, 900, C_MINT, shadow=True)}
-  {text(62, 95, "Liquid Glass · 人脸解锁守护", 14, 400, T_SECONDARY)}
-  {text(W-50, 70, "v2.1.0", 14, 500, T_SECONDARY, anchor="end")}
-  {glass_panel(50, 110, W-100, 2, 1, blur_bg=False, shadow=False)}""")
+    parts.append(f'<text x="50" y="{y+30}" font-family="Source Han Sans SC, sans-serif" font-size="28" font-weight="700" fill="{C_WHITE}">FaceGuard</text>')
+    parts.append(f'<text x="52" y="{y+55}" font-family="Source Han Sans SC, sans-serif" font-size="13" fill="{C_TEXT_DIM}">Settings · 人脸解锁守护</text>')
+    parts.append(f'<text x="{W-50}" y="{y+30}" font-family="Source Han Sans SC, sans-serif" font-size="13" fill="{C_TEXT_DIM}" text-anchor="end">v2.1.2</text>')
+    parts.append(f'<line x1="50" y1="{y+70}" x2="{W-50}" y2="{y+70}" stroke="#ffffff" stroke-opacity="0.08"/>')
 
-    # === 识别引擎 ===
-    y = 140
-    sections.append(glass_panel(50, y, W-100, 140, 22))
-    sections.append(f'<circle cx="76" cy="{y+30}" r="5" fill="{C_MINT}" filter="url(#bloom)"/>')
-    sections.append(text(92, y+36, "识别引擎", 16, 700, T_PRIMARY, shadow=True))
-    sections.append(text(180, y+36, "Recognition", 11, 400, T_HINT))
-    # 输入行
-    fields = [
-        (y+72, "置信度阈值", "0.55", "0.3–0.8", C_MINT),
-        (y+108, "确认帧数", "3", "帧", C_MINT),
-    ]
-    for fy, label, val, hint, c in fields:
-        sections.append(text(76, fy, label, 13, 500, T_SECONDARY))
-        sections.append(f'<rect x="210" y="{fy-16}" width="140" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>')
-        sections.append(text(222, fy+4, val, 13, 700, T_PRIMARY))
-        sections.append(text(360, fy+4, hint, 11, 400, T_HINT))
-    sections.append(text(470, y+72, "摄像头序号", 13, 500, T_SECONDARY))
-    sections.append(f'<rect x="610" y="{y+56}" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>')
-    sections.append(text(622, y+76, "0", 13, 700, T_PRIMARY))
-    sections.append(text(470, y+108, "识别帧率", 13, 500, T_SECONDARY))
-    sections.append(f'<rect x="610" y="{y+92}" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>')
-    sections.append(text(622, y+112, "15 fps", 13, 700, T_PRIMARY))
+    def section(sy, title, color, rows):
+        r = [f'<circle cx="60" cy="{sy+22}" r="4" fill="{color}"/>',
+             f'<text x="74" y="{sy+27}" font-family="Source Han Sans SC, sans-serif" font-size="15" font-weight="700" fill="{C_WHITE}">{title}</text>']
+        for i, (label, val, hint) in enumerate(rows):
+            ry = sy + 60 + i * 36
+            r.append(f'<text x="60" y="{ry+12}" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="{C_TEXT_DIM}">{label}</text>')
+            r.append(f'<rect x="220" y="{ry}" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>')
+            r.append(f'<text x="230" y="{ry+17}" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="{C_WHITE}">{val}</text>')
+            if hint:
+                r.append(f'<text x="370" y="{ry+17}" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="{C_TEXT_HINT}">{hint}</text>')
+        return "\n".join(r)
 
-    # === 识别模型（三选一） ===
-    y = 300
-    sections.append(glass_panel(50, y, W-100, 170, 22))
-    sections.append(f'<circle cx="76" cy="{y+30}" r="5" fill="{C_PURPLE}" filter="url(#bloom)"/>')
-    sections.append(text(92, y+36, "识别模型", 16, 700, T_PRIMARY, shadow=True))
-    sections.append(text(180, y+36, "Model · 三选一", 11, 400, T_HINT))
+    parts.append(section(150, "识别引擎", C_LASER, [
+        ("置信度阈值", "0.55", "0.3–0.8"),
+        ("确认帧数", "3", "帧"),
+        ("摄像头序号", "0", ""),
+        ("识别帧率", "15 fps", ""),
+    ]))
 
-    # 三个模型卡片
+    # 模型选择
+    my = 330
+    parts.append(f'<circle cx="60" cy="{my+22}" r="4" fill="{C_LASER_LT}"/>')
+    parts.append(f'<text x="74" y="{my+27}" font-family="Source Han Sans SC, sans-serif" font-size="15" font-weight="700" fill="{C_WHITE}">识别模型</text>')
     models = [
-        (76, "YuNet + SFace", "默认 · 精度 99.5%", "38 MB · 平衡推荐", C_MINT, True),
-        (330, "MobileFaceNet", "轻量 · 精度 99.0%", "5 MB · 老电脑友好", C_BLUE_LT, False),
-        (584, "ArcFace ResNet50", "高精度 · 99.8%", "170 MB · 极致精度", C_PURPLE_LT, False),
+        (60, "YuNet + SFace", "默认 · 99.5%", "38 MB", C_LASER, True),
+        (320, "MobileFaceNet", "轻量 · 99.0%", "5 MB", C_TEXT_DIM, False),
+        (580, "ArcFace ResNet50", "高精度 · 99.8%", "170 MB", C_TEXT_DIM, False),
     ]
-    for mx, name, desc, size, color, selected in models:
-        card_w = 250
-        card_y = y + 56
-        card_h = 96
-        if selected:
-            sections.append(f'<rect x="{mx}" y="{card_y}" width="{card_w}" height="{card_h}" rx="16" fill="{color}" fill-opacity="0.12" stroke="{color}" stroke-width="2" filter="url(#bloom)"/>')
-            sections.append(f'<circle cx="{mx+20}" cy="{card_y+22}" r="4" fill="{color}" filter="url(#bloom)"/>')
-            sections.append(text(mx+32, card_y+28, name, 14, 700, color, shadow=True))
+    for mx, name, desc, size, color, sel in models:
+        cw = 260
+        cy = my + 50
+        if sel:
+            parts.append(f'<rect x="{mx}" y="{cy}" width="{cw}" height="80" rx="8" fill="{color}" fill-opacity="0.1" stroke="{color}" stroke-width="1.5"/>')
         else:
-            sections.append(f'<rect x="{mx}" y="{card_y}" width="{card_w}" height="{card_h}" rx="16" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)"/>')
-            sections.append(f'<circle cx="{mx+20}" cy="{card_y+22}" r="4" fill="{T_HINT}"/>')
-            sections.append(text(mx+32, card_y+28, name, 14, 500, T_PRIMARY))
-        sections.append(text(mx+20, card_y+54, desc, 12, 400, T_SECONDARY))
-        sections.append(text(mx+20, card_y+76, size, 11, 400, T_HINT))
+            parts.append(f'<rect x="{mx}" y="{cy}" width="{cw}" height="80" rx="8" fill="#ffffff" fill-opacity="0.03" stroke="#ffffff" stroke-opacity="0.08"/>')
+        parts.append(f'<circle cx="{mx+18}" cy="{cy+20}" r="3" fill="{color}"/>')
+        parts.append(f'<text x="{mx+28}" y="{cy+25}" font-family="Source Han Sans SC, sans-serif" font-size="13" font-weight="600" fill="{"#fff" if sel else C_WHITE}">{name}</text>')
+        parts.append(f'<text x="{mx+18}" y="{cy+48}" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="{C_TEXT_DIM}">{desc}</text>')
+        parts.append(f'<text x="{mx+18}" y="{cy+66}" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="{C_TEXT_HINT}">{size}</text>')
 
-    # === 自适应学习 ===
-    y = 490
-    sections.append(glass_panel(50, y, W-100, 170, 22))
-    sections.append(f'<circle cx="76" cy="{y+30}" r="5" fill="{C_MINT_LT}" filter="url(#bloom)"/>')
-    sections.append(text(92, y+36, "自适应学习", 16, 700, T_PRIMARY, shadow=True))
-    sections.append(text(200, y+36, "Adaptive · 记忆脸部变化", 11, 400, T_HINT))
-    sections.append(toggle_switch(W-130, y+22, True, C_MINT))
-    sections.append(text(76, y+78, "成功解锁后增量学习", 13, 500, T_PRIMARY))
-    sections.append(text(76, y+98, "程序自动记住你脸部变化（光线 / 角度 / 表情）", 11, 400, T_HINT))
-    sections.append(text(76, y+134, "每用户最多", 13, 500, T_SECONDARY))
-    sections.append(f'<rect x="200" y="{y+118}" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>')
-    sections.append(text(212, y+138, "30", 13, 700, T_PRIMARY))
-    sections.append(text(290, y+138, "个样本", 11, 400, T_HINT))
-    sections.append(text(470, y+134, "冷却秒数", 13, 500, T_SECONDARY))
-    sections.append(f'<rect x="610" y="{y+118}" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>')
-    sections.append(text(622, y+138, "300", 13, 700, T_PRIMARY))
+    parts.append(section(490, "自适应学习", C_LASER_LT, [
+        ("每用户最多", "30", "个样本"),
+        ("冷却秒数", "300", ""),
+    ]))
+    # 自适应开关
+    parts.append(f'<rect x="{W-110}" y="490" width="44" height="24" rx="12" fill="{C_LASER}"/>')
+    parts.append(f'<circle cx="{W-90}" cy="502" r="9" fill="#fff"/>')
+    parts.append(f'<text x="60" y="540" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="{C_WHITE}">成功解锁后增量学习</text>')
+    parts.append(f'<text x="60" y="558" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="{C_TEXT_HINT}">程序自动记住你脸部变化（光线/角度/表情）</text>')
 
-    # === 邮件告警 ===
-    y = 680
-    sections.append(glass_panel(50, y, W-100, 170, 22))
-    sections.append(f'<circle cx="76" cy="{y+30}" r="5" fill="{C_AMBER}" filter="url(#bloom)"/>')
-    sections.append(text(92, y+36, "邮件告警", 16, 700, T_PRIMARY, shadow=True))
-    sections.append(text(180, y+36, "失败抓拍 / 入侵提醒", 11, 400, T_HINT))
-    sections.append(text(76, y+78, "SMTP 服务器", 13, 500, T_SECONDARY))
-    sections.append(f'<rect x="210" y="{y+62}" width="260" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>')
-    sections.append(text(222, y+82, "smtp.qq.com", 13, 500, T_PRIMARY))
-    sections.append(text(76, y+118, "发件邮箱", 13, 500, T_SECONDARY))
-    sections.append(f'<rect x="210" y="{y+102}" width="340" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>')
-    sections.append(text(222, y+122, "1247053973@qq.com", 13, 500, T_PRIMARY))
-    sections.append(text(570, y+118, "授权码", 13, 500, T_SECONDARY))
-    sections.append(f'<rect x="660" y="{y+102}" width="160" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>')
-    sections.append(text(672, y+122, "●●●●●●●●", 13, 500, T_PRIMARY))
-    sections.append(text(76, y+158, "告警冷却", 13, 500, T_SECONDARY))
-    sections.append(f'<rect x="210" y="{y+142}" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>')
-    sections.append(text(222, y+162, "60", 13, 700, T_PRIMARY))
-    sections.append(text(300, y+162, "秒", 11, 400, T_HINT))
+    parts.append(section(620, "邮件告警", C_AMBER, [
+        ("SMTP 服务器", "smtp.qq.com", ""),
+        ("发件邮箱", "1247053973@qq.com", ""),
+        ("授权码", "●●●●●●●●", ""),
+        ("告警冷却", "60", "秒"),
+    ]))
 
-    # === 离开锁屏休眠 ===
-    y = 870
-    sections.append(glass_panel(50, y, W-100, 120, 22))
-    sections.append(f'<circle cx="76" cy="{y+30}" r="5" fill="{C_BLUE}" filter="url(#bloom)"/>')
-    sections.append(text(92, y+36, "离开锁屏休眠", 16, 700, T_PRIMARY, shadow=True))
-    sections.append(text(220, y+36, "Presence", 11, 400, T_HINT))
-    sections.append(text(76, y+80, "离开锁屏", 13, 500, T_SECONDARY))
-    sections.append(f'<rect x="210" y="{y+64}" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>')
-    sections.append(text(222, y+84, "300", 13, 700, T_PRIMARY))
-    sections.append(text(300, y+84, "秒", 11, 400, T_HINT))
-    sections.append(text(470, y+80, "锁屏休眠", 13, 500, T_SECONDARY))
-    sections.append(f'<rect x="610" y="{y+64}" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>')
-    sections.append(text(622, y+84, "300", 13, 700, T_PRIMARY))
-    sections.append(text(700, y+84, "秒", 11, 400, T_HINT))
+    parts.append(section(820, "离开锁屏休眠", C_LASER, [
+        ("离开锁屏", "300", "秒"),
+        ("锁屏休眠", "300", "秒"),
+    ]))
 
-    # === 功能开关 ===
-    y = 1010
-    sections.append(glass_panel(50, y, W-100, 90, 22))
-    sections.append(f'<circle cx="76" cy="{y+30}" r="5" fill="{C_PURPLE}" filter="url(#bloom)"/>')
-    sections.append(text(92, y+36, "功能开关", 16, 700, T_PRIMARY, shadow=True))
-    sections.append(text(76, y+76, "身后入侵守护", 13, 500, T_PRIMARY))
-    sections.append(toggle_switch(W-130, y+62, True, C_MINT))
-    sections.append(text(330, y+76, "注册表自启", 13, 500, T_PRIMARY))
-    sections.append(toggle_switch(W-130-260, y+62, True, C_MINT))
+    # 功能开关
+    parts.append(f'<circle cx="60" cy="980" r="4" fill="{C_LASER_LT}"/>')
+    parts.append(f'<text x="74" y="985" font-family="Source Han Sans SC, sans-serif" font-size="15" font-weight="700" fill="{C_WHITE}">功能开关</text>')
+    parts.append(f'<text x="60" y="1020" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="{C_WHITE}">身后入侵守护</text>')
+    parts.append(f'<rect x="{W-110}" y="1005" width="44" height="24" rx="12" fill="{C_LASER}"/>')
+    parts.append(f'<circle cx="{W-90}" cy="1017" r="9" fill="#fff"/>')
+    parts.append(f'<text x="300" y="1020" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="{C_WHITE}">注册表自启</text>')
+    parts.append(f'<rect x="{W-370}" y="1005" width="44" height="24" rx="12" fill="{C_LASER}"/>')
+    parts.append(f'<circle cx="{W-350}" cy="1017" r="9" fill="#fff"/>')
 
     # 保存按钮
-    sections.append(f'<rect x="{W//2-130}" y="1130" width="260" height="46" rx="23" fill="url(#btnMint)" filter="url(#dropShadow)"/>')
-    sections.append(text(W//2, 1159, "保存设置", 16, 700, "#0A1A12", anchor="middle"))
+    parts.append(f'<rect x="{W//2-100}" y="1050" width="200" height="40" rx="20" fill="{C_LASER}"/>')
+    parts.append(f'<text x="{W//2}" y="1075" font-family="Source Han Sans SC, sans-serif" font-size="14" font-weight="700" fill="#0A0A0E" text-anchor="middle">保存设置</text>')
 
-    return render_svg("\n".join(sections), "06_settings_panel", W, H)
+    return render_svg("\n".join(parts), "06_settings_panel", W, H)
 
 
-def shot_07_enroll() -> bool:
-    """注册人脸流程：扫描引导 + 进度。"""
+def shot_07_enroll():
     W, H = 800, 600
-    cx, cy = 400, 270
-    content = f"""
-  <rect x="30" y="30" width="{W-60}" height="{H-60}" rx="28" fill="#000000" opacity="0.25" filter="url(#dropShadow)"/>
-  {face_silhouette(cx, cy, 1.35, "#3A3A5C")}
+    cx, cy = 400, 290
+    fw, fh = 230, 250
+    content = f'''
+  <ellipse cx="{cx}" cy="{cy-30}" rx="58" ry="73" fill="#1A1A24" opacity="0.8"/>
+  <path d="M{cx-78},{cy+82} Q{cx-78},{cy+22} {cx},{cy+22} Q{cx+78},{cy+22} {cx+78},{cy+82} Z" fill="#1A1A24" opacity="0.8"/>
 
-  <!-- 引导光晕 -->
-  {halo(cx, cy-10, 180, C_PURPLE, 0.3)}
+  <!-- 蓝色激光点阵（注册中） -->
+  {face_mesh_dots(cx, cy, 1.05, C_LASER, fw, fh)}
 
-  <!-- 人脸框（圆角流光） -->
-  <rect x="{cx-115}" y="{cy-135}" width="230" height="240" rx="22" fill="none"
-        stroke="url(#rainbowBorder)" stroke-width="3" filter="url(#bloom)"/>
+  <!-- 人脸框 -->
+  {face_box(cx-fw//2, cy-fh//2-10, fw, fh, C_LASER)}
 
   <!-- 扫描线 -->
-  {scan_line(cx-115, cy-135, 230, 240, C_PURPLE_LT, 0.35)}
-
-  {face_landmarks(cx, cy-10, 1.35, C_PURPLE_LT)}
-
-  <!-- 顶部状态 -->
-  {glass_panel(30, 40, 300, 52, 26)}
-  <circle cx="56" cy="66" r="6" fill="{C_PURPLE}" filter="url(#bloom)"/>
-  {text(72, 71, "FaceGuard", 17, 700, T_ON_GLASS, shadow=True)}
-  {text(186, 71, "注册中", 12, 500, C_PURPLE_LT)}
+  {scan_line(cx-fw//2, cy-fh//2-10, fw, fh, C_LASER, 0.35)}
 
   <!-- 采集进度 -->
-  {glass_panel(30, 105, 380, 48, 24)}
-  {text(50, 135, "采集 5/8", 15, 700, C_PURPLE_LT, shadow=True)}
-  {text(145, 135, "请正对摄像头", 12, 400, T_SECONDARY)}
+  <rect x="30" y="100" width="200" height="28" rx="4" fill="{C_BG}" opacity="0.75"/>
+  <rect x="30" y="100" width="3" height="28" fill="{C_LASER}"/>
+  <text x="44" y="118" font-family="Source Han Sans SC, sans-serif" font-size="13" font-weight="600" fill="{C_LASER}">采集 5/8</text>
+  <text x="120" y="118" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="{C_TEXT_DIM}">请正对摄像头</text>
 
   <!-- 角度引导 -->
-  {glass_panel(430, 105, 340, 48, 24)}
-  {text(450, 135, "← 正面 → 左侧 → 右侧", 12, 500, T_SECONDARY)}
-  {text(750, 135, "当前: 正面", 11, 700, C_PURPLE_LT, anchor="end")}
+  <rect x="250" y="100" width="280" height="28" rx="4" fill="{C_BG}" opacity="0.75"/>
+  <text x="264" y="118" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="{C_TEXT_DIM}">← 正面 → 左侧 → 右侧</text>
+  <text x="520" y="118" font-family="Source Han Sans SC, sans-serif" font-size="11" font-weight="600" fill="{C_LASER}" text-anchor="end">当前: 正面</text>
+
+  {top_bar("Enroll · 注册中", C_LASER)}
 
   <!-- 底部进度条 -->
-  {glass_panel(30, H-80, W-60, 50, 18)}
-  {progress_bar(60, H-60, W-120, 10, 62.5, C_PURPLE_LT)}
-  {text(60, H-88, "注册进度", 12, 500, T_SECONDARY)}
-  {text(W-60, H-88, "62%", 14, 700, C_PURPLE_LT, anchor="end")}
+  <rect x="60" y="{H-65}" width="{W-120}" height="6" rx="3" fill="#ffffff" opacity="0.1"/>
+  <rect x="60" y="{H-65}" width="{(W-120)*0.625}" height="6" rx="3" fill="{C_LASER}" filter="url(#laserGlow)"/>
+  <text x="60" y="{H-75}" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="{C_TEXT_DIM}">注册进度</text>
+  <text x="{W-60}" y="{H-75}" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="{C_LASER}" text-anchor="end">62%</text>
 
-  {sparkle(180, 200, 4, C_PURPLE_LT)}
-  {sparkle(620, 180, 3, C_PURPLE_LT)}
-  {sparkle(150, 400, 3, "#ffffff")}"""
+  {status_bar(W, H, "注册人脸 · 采集多角度特征", C_LASER)}'''
     return render_svg(content, "07_enroll", W, H)
 
 
-def shot_08_dashboard() -> bool:
-    """主面板：系统状态 + 快捷操作 + 统计。"""
+def shot_08_dashboard():
     W, H = 800, 600
     parts = []
-    parts.append(glass_panel(80, 60, W-160, H-120, 28))
-    parts.append(halo(130, 115, 35, C_MINT, 0.3))
-    parts.append(f'<circle cx="130" cy="115" r="14" fill="{C_MINT}" filter="url(#bloom)"/>')
-    parts.append(f'<circle cx="130" cy="115" r="24" fill="{C_MINT}" opacity="0.2" filter="url(#bloom)"/>')
-    parts.append(text(158, 108, "FaceGuard", 28, 900, T_PRIMARY, shadow=True))
-    parts.append(text(310, 108, "v2.1.0", 13, 400, T_HINT))
+    # 主面板
+    parts.append(f'<rect x="80" y="60" width="{W-160}" height="{H-120}" rx="16" fill="{C_BG_PANEL}" opacity="0.6"/>')
 
-    # 运行状态卡片
-    parts.append(glass_panel(120, 160, W-240, 80, 18))
-    parts.append(f'<circle cx="155" cy="200" r="10" fill="{C_MINT}" filter="url(#bloom)"/>')
-    parts.append(f'<circle cx="155" cy="200" r="20" fill="{C_MINT}" opacity="0.2" filter="url(#bloom)"/>')
-    parts.append(pulse_ring(155, 200, 14, C_MINT, 1.5))
-    parts.append(text(180, 194, "运行中", 18, 700, C_MINT_LT, shadow=True))
-    parts.append(text(180, 216, "守护已激活 · 已注册 1 人", 12, 400, T_SECONDARY))
-    parts.append(text(W-150, 200, "●", 20, 900, C_MINT, anchor="end"))
+    # 标题
+    parts.append(f'<circle cx="130" cy="115" r="10" fill="{C_LASER}" filter="url(#laserGlow)"/>')
+    parts.append(f'<text x="155" y="122" font-family="Source Han Sans SC, sans-serif" font-size="24" font-weight="700" fill="{C_WHITE}">FaceGuard</text>')
+    parts.append(f'<text x="300" y="122" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="{C_TEXT_DIM}">v2.1.2</text>')
 
-    # 三个快捷操作
-    for ox, title, sub, color in [
-        (120, "注册人脸", "采集多角度", C_MINT_LT),
-        (300, "设置", "调整参数", C_PURPLE_LT),
-        (480, "测试邮件", "验证告警", C_AMBER_LT),
-    ]:
-        parts.append(glass_panel(ox, 260, 180, 90, 16))
-        parts.append(f'<circle cx="{ox+28}" cy="290" r="10" fill="{color}" filter="url(#bloom)"/>')
-        parts.append(f'<circle cx="{ox+28}" cy="290" r="18" fill="{color}" opacity="0.2" filter="url(#bloom)"/>')
-        parts.append(text(ox+48, 296, title, 15, 700, T_PRIMARY, shadow=True))
-        parts.append(text(ox+20, 328, sub, 11, 400, T_HINT))
+    # 运行状态
+    parts.append(f'<rect x="120" y="155" width="{W-240}" height="64" rx="8" fill="#ffffff" fill-opacity="0.04"/>')
+    parts.append(f'<circle cx="150" cy="187" r="8" fill="{C_LASER}" filter="url(#laserGlow)"/>')
+    parts.append(f'<circle cx="150" cy="187" r="14" fill="{C_LASER}" opacity="0.2"/>')
+    parts.append(f'<text x="170" y="183" font-family="Source Han Sans SC, sans-serif" font-size="15" font-weight="600" fill="{C_LASER}">运行中</text>')
+    parts.append(f'<text x="170" y="202" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="{C_TEXT_DIM}">守护已激活 · 已注册 1 人</text>')
+
+    # 快捷操作
+    for ox, title, sub, color in [(120, "注册人脸", "采集多角度", C_LASER),
+                                   (300, "设置", "调整参数", C_LASER_LT),
+                                   (480, "测试邮件", "验证告警", C_AMBER)]:
+        parts.append(f'<rect x="{ox}" y="240" width="160" height="76" rx="8" fill="#ffffff" fill-opacity="0.04"/>')
+        parts.append(f'<circle cx="{ox+24}" cy="266" r="8" fill="{color}"/>')
+        parts.append(f'<text x="{ox+42}" y="271" font-family="Source Han Sans SC, sans-serif" font-size="13" font-weight="600" fill="{C_WHITE}">{title}</text>')
+        parts.append(f'<text x="{ox+16}" y="298" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="{C_TEXT_HINT}">{sub}</text>')
 
     # 今日统计
-    parts.append(glass_panel(120, 370, W-240, 130, 18))
-    parts.append(text(140, 400, "今日统计", 15, 700, T_PRIMARY, shadow=True))
-    parts.append(text(160, 435, "解锁次数", 12, 500, T_SECONDARY))
-    parts.append(text(160, 475, "23", 36, 900, C_MINT, shadow=True))
-    parts.append(text(340, 435, "失败告警", 12, 500, T_SECONDARY))
-    parts.append(text(340, 475, "1", 36, 900, C_CORAL, shadow=True))
-    parts.append(text(520, 435, "学习样本", 12, 500, T_SECONDARY))
-    parts.append(text(520, 475, "12", 36, 900, C_PURPLE_LT, shadow=True))
-    parts.append(text(140, H-100, "最近解锁 14:32 · 阈值 0.58 · 模型 SFace", 11, 400, T_HINT))
+    parts.append(f'<rect x="120" y="335" width="{W-240}" height="110" rx="8" fill="#ffffff" fill-opacity="0.04"/>')
+    parts.append(f'<text x="140" y="360" font-family="Source Han Sans SC, sans-serif" font-size="13" font-weight="600" fill="{C_WHITE}">今日统计</text>')
+    parts.append(f'<text x="160" y="390" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="{C_TEXT_DIM}">解锁次数</text>')
+    parts.append(f'<text x="160" y="425" font-family="Source Han Sans SC, sans-serif" font-size="30" font-weight="200" fill="{C_LASER}">23</text>')
+    parts.append(f'<text x="340" y="390" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="{C_TEXT_DIM}">失败告警</text>')
+    parts.append(f'<text x="340" y="425" font-family="Source Han Sans SC, sans-serif" font-size="30" font-weight="200" fill="{C_RED}">1</text>')
+    parts.append(f'<text x="520" y="390" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="{C_TEXT_DIM}">学习样本</text>')
+    parts.append(f'<text x="520" y="425" font-family="Source Han Sans SC, sans-serif" font-size="30" font-weight="200" fill="{C_LASER_LT}">12</text>')
+    parts.append(f'<text x="140" y="475" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="{C_TEXT_HINT}">最近解锁 14:32 · 阈值 0.58 · 模型 SFace</text>')
 
     # 退出按钮
-    parts.append(f'<rect x="{W//2-70}" y="{H-80}" width="140" height="38" rx="19" fill="rgba(255,69,58,0.08)" stroke="rgba(255,69,58,0.3)" filter="url(#dropShadowSm)"/>')
-    parts.append(text(W//2, H-55, "退出", 14, 500, C_CORAL_LT, anchor="middle"))
+    parts.append(f'<rect x="{W//2-60}" y="500" width="120" height="34" rx="17" fill="{C_RED}" fill-opacity="0.08" stroke="{C_RED}" stroke-opacity="0.3"/>')
+    parts.append(f'<text x="{W//2}" y="522" font-family="Source Han Sans SC, sans-serif" font-size="13" fill="{C_RED_LT}" text-anchor="middle">退出</text>')
 
     return render_svg("\n".join(parts), "08_dashboard", W, H)
 
 
-# ═══════════════════════════════════════════════════════════════
-#  主入口
-# ═══════════════════════════════════════════════════════════════
-
 if __name__ == "__main__":
     shots = [
-        ("1. 识别本人成功",   shot_01_recognize_owner),
-        ("2. 识别陌生人",     shot_02_recognize_stranger),
-        ("3. 身后入侵守护",   shot_03_guardian_intruder),
-        ("4. 离开锁屏休眠",   shot_04_absence),
-        ("5. 多帧确认中",     shot_05_recognizing),
-        ("6. 设置面板",       shot_06_settings),
-        ("7. 注册人脸",       shot_07_enroll),
-        ("8. 主面板",         shot_08_dashboard),
+        ("1. 识别本人成功", shot_01_owner),
+        ("2. 识别陌生人", shot_02_stranger),
+        ("3. 身后入侵守护", shot_03_guardian),
+        ("4. 离开锁屏休眠", shot_04_absence),
+        ("5. 多帧确认中", shot_05_recognizing),
+        ("6. 设置面板", shot_06_settings),
+        ("7. 注册人脸", shot_07_enroll),
+        ("8. 主面板", shot_08_dashboard),
     ]
     print("=" * 50)
-    print("  FaceGuard · Liquid Glass UI v2 渲染")
-    print("  Apple Liquid Glass 2025 · Tim Cook Aesthetic")
+    print("  FaceGuard · 简洁风格 + 蓝色激光点阵")
     print("=" * 50)
-    ok_count = 0
+    ok = 0
     for name, fn in shots:
-        ok = fn()
-        mark = "OK" if ok else "FAIL"
-        if ok:
-            ok_count += 1
-        print(f"  [{mark}] {name}")
-    print(f"\n  完成: {ok_count}/{len(shots)} 张截图 → {OUT}/")
+        if fn():
+            ok += 1
+            print(f"  [OK] {name}")
+        else:
+            print(f"  [FAIL] {name}")
+    print(f"\n  完成: {ok}/{len(shots)} → {OUT}/")

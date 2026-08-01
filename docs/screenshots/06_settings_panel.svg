@@ -1,429 +1,118 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1180" width="900" height="1180">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1080" width="900" height="1080">
 
 <defs>
-  <!-- ═══ 真实毛玻璃滤镜（背景模糊） ═══ -->
-  <filter id="glassBlur" x="-30%" y="-30%" width="160%" height="160%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="14"/>
-  </filter>
-  <filter id="glassBlurLg" x="-30%" y="-30%" width="160%" height="160%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="28"/>
-  </filter>
-  <filter id="glassBlurSm" x="-20%" y="-20%" width="140%" height="140%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="6"/>
-  </filter>
-
-  <!-- ═══ 镜面高光滤镜（边缘折射） ═══ -->
-  <filter id="specular" x="-20%" y="-20%" width="140%" height="140%">
-    <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>
-    <feSpecularLighting in="blur" surfaceScale="5" specularConstant="0.9"
-                        specularExponent="25" lighting-color="#ffffff" result="spec">
-      <feDistantLight azimuth="225" elevation="55"/>
-    </feSpecularLighting>
-    <feComposite in="spec" in2="SourceAlpha" operator="in" result="specOut"/>
-    <feComposite in="SourceGraphic" in2="specOut" operator="arithmetic"
-                 k1="0" k2="1" k3="0.8" k4="0"/>
-  </filter>
-
-  <!-- ═══ 液态折射滤镜（微扭曲） ═══ -->
-  <filter id="liquidRefract" x="-10%" y="-10%" width="120%" height="120%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.018"
-                  numOctaves="2" seed="3" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="6"
-                       xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-
-  <!-- ═══ 发光 / 泛光滤镜 ═══ -->
-  <filter id="bloom" x="-50%" y="-50%" width="200%" height="200%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+  <!-- 激光点光晕 -->
+  <filter id="laserGlow" x="-100%" y="-100%" width="300%" height="300%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur"/>
     <feMerge>
       <feMergeNode in="blur"/>
       <feMergeNode in="blur"/>
       <feMergeNode in="SourceGraphic"/>
     </feMerge>
   </filter>
-  <filter id="bloomStrong" x="-80%" y="-80%" width="260%" height="260%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
-    <feMerge>
-      <feMergeNode in="blur"/>
-      <feMergeNode in="blur"/>
-      <feMergeNode in="blur"/>
-      <feMergeNode in="SourceGraphic"/>
-    </feMerge>
-  </filter>
-  <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
-    <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+  <filter id="laserGlowSm" x="-100%" y="-100%" width="300%" height="300%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur"/>
     <feMerge>
       <feMergeNode in="blur"/>
       <feMergeNode in="SourceGraphic"/>
     </feMerge>
   </filter>
-
-  <!-- ═══ 背景壁纸渐变（macOS Sonoma 风格彩色网格） ═══ -->
-  <linearGradient id="wallpaperBase" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%"  stop-color="#1A1033"/>
-    <stop offset="35%" stop-color="#2D1B4E"/>
-    <stop offset="65%" stop-color="#1E1A3D"/>
-    <stop offset="100%" stop-color="#0D0F1E"/>
-  </linearGradient>
-
-  <!-- 彩色光斑 -->
-  <radialGradient id="blobPurple" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#BF5AF2" stop-opacity="0.7"/>
-    <stop offset="100%" stop-color="#BF5AF2" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobPink" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#FF375F" stop-opacity="0.55"/>
-    <stop offset="100%" stop-color="#FF375F" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobOrange" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#FF9F0A" stop-opacity="0.5"/>
-    <stop offset="100%" stop-color="#FF9F0A" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobBlue" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#0A84FF" stop-opacity="0.5"/>
-    <stop offset="100%" stop-color="#0A84FF" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="blobMint" cx="50%" cy="50%" r="50%">
-    <stop offset="0%"  stop-color="#30D58C" stop-opacity="0.4"/>
-    <stop offset="100%" stop-color="#30D58C" stop-opacity="0"/>
-  </radialGradient>
-
-  <!-- ═══ 玻璃面板材质 ═══ -->
-  <linearGradient id="glassFill" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.14"/>
-    <stop offset="50%" stop-color="#ffffff" stop-opacity="0.06"/>
-    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.03"/>
-  </linearGradient>
-  <linearGradient id="glassHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.35"/>
-    <stop offset="30%" stop-color="#ffffff" stop-opacity="0.08"/>
-    <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-  </linearGradient>
-  <linearGradient id="glassEdge" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.4"/>
-    <stop offset="50%" stop-color="#ffffff" stop-opacity="0.1"/>
-    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.25"/>
-  </linearGradient>
-
-  <!-- ═══ 强调色按钮渐变 ═══ -->
-  <linearGradient id="btnMint" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#5EEAB5"/>
-    <stop offset="100%" stop-color="#28B574"/>
-  </linearGradient>
-  <linearGradient id="btnPurple" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"  stop-color="#D070FF"/>
-    <stop offset="100%" stop-color="#9B30DC"/>
-  </linearGradient>
-
-  <!-- ═══ 流光边框（彩虹渐变） ═══ -->
-  <linearGradient id="rainbowBorder" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%"   stop-color="#30D58C"/>
-    <stop offset="25%"  stop-color="#5EEAB5"/>
-    <stop offset="50%"  stop-color="#0A84FF"/>
-    <stop offset="75%"  stop-color="#BF5AF2"/>
-    <stop offset="100%" stop-color="#FF375F"/>
-  </linearGradient>
-
-  <!-- ═══ 扫描线渐变 ═══ -->
-  <linearGradient id="scanGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"   stop-color="#5EEAB5" stop-opacity="0"/>
-    <stop offset="50%"  stop-color="#5EEAB5" stop-opacity="1"/>
-    <stop offset="100%" stop-color="#5EEAB5" stop-opacity="0"/>
-  </linearGradient>
-
-  <!-- ═══ 阴影滤镜 ═══ -->
-  <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
-    <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.4"/>
+  <!-- 扫描线光晕 -->
+  <filter id="scanGlow" x="-20%" y="-200%" width="140%" height="500%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="3"/>
   </filter>
-  <filter id="dropShadowSm" x="-20%" y="-20%" width="140%" height="140%">
-    <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.3"/>
-  </filter>
-  <filter id="txtShadow" x="-50%" y="-50%" width="200%" height="200%">
-    <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.6"/>
-  </filter>
+  <!-- 背景渐变 -->
+  <radialGradient id="bgGrad" cx="50%" cy="40%" r="70%">
+    <stop offset="0%"  stop-color="#1A1A24"/>
+    <stop offset="100%" stop-color="#0A0A0E"/>
+  </radialGradient>
 </defs>
 
-
-  <!-- 深色底 -->
-  <rect width="900" height="1180" fill="url(#wallpaperBase)"/>
-  <!-- 彩色光斑（大模糊，模拟渐变网格） -->
-  <ellipse cx="135.0" cy="236.0" rx="315.0" ry="413.0" fill="url(#blobPurple)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="765.0" cy="177.0" rx="270.0" ry="354.0" fill="url(#blobPink)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="720.0" cy="944.0" rx="315.0" ry="413.0" fill="url(#blobOrange)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="180.0" cy="1003.0" rx="270.0" ry="354.0" fill="url(#blobBlue)" filter="url(#glassBlurLg)"/>
-  <ellipse cx="450.0" cy="590.0" rx="225.0" ry="295.0" fill="url(#blobMint)" filter="url(#glassBlurLg)"/>
-  <!-- 微粒噪点（模拟壁纸纹理） -->
-  <rect width="900" height="1180" fill="url(#wallpaperBase)" opacity="0.15"/>
-
-
-  <!-- 标题区 -->
-  
-  <defs>
-    <radialGradient id="halo_7" cx="50%" cy="50%" r="50%">
-      <stop offset="0%"  stop-color="#30D58C" stop-opacity="0.3"/>
-      <stop offset="40%" stop-color="#30D58C" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#30D58C" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <circle cx="80" cy="70" r="50" fill="url(#halo_7)" filter="url(#bloomStrong)"/>
-  <text x="60" y="70" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="38" font-weight="900" fill="#30D58C" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">FaceGuard</text>
-  <text x="62" y="95" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="400" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">Liquid Glass · 人脸解锁守护</text>
-  <text x="850" y="70" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="end">v2.1.0</text>
-  
-  <!-- 玻璃面板 @(50,110) 800x2 -->
-  <defs>
-    <clipPath id="clip_50_110_800_2">
-      <rect x="50" y="110" width="800" height="2" rx="1"/>
-    </clipPath>
-  </defs>
-  <g>
-
-    <rect x="50" y="110" width="800" height="2" rx="1" fill="url(#glassFill)"/>
-    <rect x="50" y="110" width="800" height="0.8" rx="1" fill="url(#glassHighlight)"/>
-
-    <rect x="50" y="110" width="800" height="2" rx="1" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="51.5" y="111.5" width="797" height="-1" rx="-0.5" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>
-
-  <!-- 玻璃面板 @(50,140) 800x140 -->
-  <defs>
-    <clipPath id="clip_50_140_800_140">
-      <rect x="50" y="140" width="800" height="140" rx="22"/>
-    </clipPath>
-  </defs>
-  <g filter="url(#dropShadow)">
-
-    <g clip-path="url(#clip_50_140_800_140)">
-      <!-- 模糊的彩色背景 -->
-      <rect x="50" y="140" width="800" height="140" fill="url(#wallpaperBase)"/>
-      <ellipse cx="210.0" cy="182.0" rx="320.0" ry="56.0" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
-      <ellipse cx="690.0" cy="238.0" rx="280.0" ry="49.0" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
-      <!-- 玻璃半透明叠层 -->
-      <rect x="50" y="140" width="800" height="140" fill="url(#glassFill)"/>
-      <!-- 顶部镜面高光 -->
-      <rect x="50" y="140" width="800" height="70.0" rx="22" fill="url(#glassHighlight)"/>
-    </g>
-
-    <rect x="50" y="140" width="800" height="140" rx="22" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="51.5" y="141.5" width="797" height="137" rx="20.5" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>
-<circle cx="76" cy="170" r="5" fill="#30D58C" filter="url(#bloom)"/>
-<text x="92" y="176" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="16" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">识别引擎</text>
-<text x="180" y="176" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">Recognition</text>
-<text x="76" y="212" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">置信度阈值</text>
-<rect x="210" y="196" width="140" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="222" y="216" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">0.55</text>
-<text x="360" y="216" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">0.3–0.8</text>
-<text x="76" y="248" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">确认帧数</text>
-<rect x="210" y="232" width="140" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="222" y="252" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">3</text>
-<text x="360" y="252" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">帧</text>
-<text x="470" y="212" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">摄像头序号</text>
-<rect x="610" y="196" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="622" y="216" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">0</text>
-<text x="470" y="248" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">识别帧率</text>
-<rect x="610" y="232" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="622" y="252" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">15 fps</text>
-
-  <!-- 玻璃面板 @(50,300) 800x170 -->
-  <defs>
-    <clipPath id="clip_50_300_800_170">
-      <rect x="50" y="300" width="800" height="170" rx="22"/>
-    </clipPath>
-  </defs>
-  <g filter="url(#dropShadow)">
-
-    <g clip-path="url(#clip_50_300_800_170)">
-      <!-- 模糊的彩色背景 -->
-      <rect x="50" y="300" width="800" height="170" fill="url(#wallpaperBase)"/>
-      <ellipse cx="210.0" cy="351.0" rx="320.0" ry="68.0" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
-      <ellipse cx="690.0" cy="419.0" rx="280.0" ry="59.49999999999999" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
-      <!-- 玻璃半透明叠层 -->
-      <rect x="50" y="300" width="800" height="170" fill="url(#glassFill)"/>
-      <!-- 顶部镜面高光 -->
-      <rect x="50" y="300" width="800" height="85.0" rx="22" fill="url(#glassHighlight)"/>
-    </g>
-
-    <rect x="50" y="300" width="800" height="170" rx="22" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="51.5" y="301.5" width="797" height="167" rx="20.5" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>
-<circle cx="76" cy="330" r="5" fill="#BF5AF2" filter="url(#bloom)"/>
-<text x="92" y="336" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="16" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">识别模型</text>
-<text x="180" y="336" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">Model · 三选一</text>
-<rect x="76" y="356" width="250" height="96" rx="16" fill="#30D58C" fill-opacity="0.12" stroke="#30D58C" stroke-width="2" filter="url(#bloom)"/>
-<circle cx="96" cy="378" r="4" fill="#30D58C" filter="url(#bloom)"/>
-<text x="108" y="384" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="700" fill="#30D58C" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">YuNet + SFace</text>
-<text x="96" y="410" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">默认 · 精度 99.5%</text>
-<text x="96" y="432" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">38 MB · 平衡推荐</text>
-<rect x="330" y="356" width="250" height="96" rx="16" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)"/>
-<circle cx="350" cy="378" r="4" fill="#636366"/>
-<text x="362" y="384" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="500" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">MobileFaceNet</text>
-<text x="350" y="410" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">轻量 · 精度 99.0%</text>
-<text x="350" y="432" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">5 MB · 老电脑友好</text>
-<rect x="584" y="356" width="250" height="96" rx="16" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.1)"/>
-<circle cx="604" cy="378" r="4" fill="#636366"/>
-<text x="616" y="384" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="500" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">ArcFace ResNet50</text>
-<text x="604" y="410" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="400" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">高精度 · 99.8%</text>
-<text x="604" y="432" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">170 MB · 极致精度</text>
-
-  <!-- 玻璃面板 @(50,490) 800x170 -->
-  <defs>
-    <clipPath id="clip_50_490_800_170">
-      <rect x="50" y="490" width="800" height="170" rx="22"/>
-    </clipPath>
-  </defs>
-  <g filter="url(#dropShadow)">
-
-    <g clip-path="url(#clip_50_490_800_170)">
-      <!-- 模糊的彩色背景 -->
-      <rect x="50" y="490" width="800" height="170" fill="url(#wallpaperBase)"/>
-      <ellipse cx="210.0" cy="541.0" rx="320.0" ry="68.0" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
-      <ellipse cx="690.0" cy="609.0" rx="280.0" ry="59.49999999999999" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
-      <!-- 玻璃半透明叠层 -->
-      <rect x="50" y="490" width="800" height="170" fill="url(#glassFill)"/>
-      <!-- 顶部镜面高光 -->
-      <rect x="50" y="490" width="800" height="85.0" rx="22" fill="url(#glassHighlight)"/>
-    </g>
-
-    <rect x="50" y="490" width="800" height="170" rx="22" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="51.5" y="491.5" width="797" height="167" rx="20.5" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>
-<circle cx="76" cy="520" r="5" fill="#5EEAB5" filter="url(#bloom)"/>
-<text x="92" y="526" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="16" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">自适应学习</text>
-<text x="200" y="526" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">Adaptive · 记忆脸部变化</text>
-
-  <rect x="770" y="512" width="50" height="30" rx="15" fill="#30D58C" opacity="0.85" filter="url(#dropShadowSm)"/>
-  <circle cx="796" cy="527" r="12" fill="#ffffff" filter="url(#softGlow)"/>
-<text x="76" y="568" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">成功解锁后增量学习</text>
-<text x="76" y="588" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">程序自动记住你脸部变化（光线 / 角度 / 表情）</text>
-<text x="76" y="624" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">每用户最多</text>
-<rect x="200" y="608" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="212" y="628" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">30</text>
-<text x="290" y="628" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">个样本</text>
-<text x="470" y="624" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">冷却秒数</text>
-<rect x="610" y="608" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="622" y="628" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">300</text>
-
-  <!-- 玻璃面板 @(50,680) 800x170 -->
-  <defs>
-    <clipPath id="clip_50_680_800_170">
-      <rect x="50" y="680" width="800" height="170" rx="22"/>
-    </clipPath>
-  </defs>
-  <g filter="url(#dropShadow)">
-
-    <g clip-path="url(#clip_50_680_800_170)">
-      <!-- 模糊的彩色背景 -->
-      <rect x="50" y="680" width="800" height="170" fill="url(#wallpaperBase)"/>
-      <ellipse cx="210.0" cy="731.0" rx="320.0" ry="68.0" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
-      <ellipse cx="690.0" cy="799.0" rx="280.0" ry="59.49999999999999" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
-      <!-- 玻璃半透明叠层 -->
-      <rect x="50" y="680" width="800" height="170" fill="url(#glassFill)"/>
-      <!-- 顶部镜面高光 -->
-      <rect x="50" y="680" width="800" height="85.0" rx="22" fill="url(#glassHighlight)"/>
-    </g>
-
-    <rect x="50" y="680" width="800" height="170" rx="22" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="51.5" y="681.5" width="797" height="167" rx="20.5" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>
-<circle cx="76" cy="710" r="5" fill="#FF9F0A" filter="url(#bloom)"/>
-<text x="92" y="716" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="16" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">邮件告警</text>
-<text x="180" y="716" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">失败抓拍 / 入侵提醒</text>
-<text x="76" y="758" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">SMTP 服务器</text>
-<rect x="210" y="742" width="260" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="222" y="762" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">smtp.qq.com</text>
-<text x="76" y="798" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">发件邮箱</text>
-<rect x="210" y="782" width="340" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="222" y="802" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">1247053973@qq.com</text>
-<text x="570" y="798" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">授权码</text>
-<rect x="660" y="782" width="160" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="672" y="802" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">●●●●●●●●</text>
-<text x="76" y="838" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">告警冷却</text>
-<rect x="210" y="822" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="222" y="842" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">60</text>
-<text x="300" y="842" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">秒</text>
-
-  <!-- 玻璃面板 @(50,870) 800x120 -->
-  <defs>
-    <clipPath id="clip_50_870_800_120">
-      <rect x="50" y="870" width="800" height="120" rx="22"/>
-    </clipPath>
-  </defs>
-  <g filter="url(#dropShadow)">
-
-    <g clip-path="url(#clip_50_870_800_120)">
-      <!-- 模糊的彩色背景 -->
-      <rect x="50" y="870" width="800" height="120" fill="url(#wallpaperBase)"/>
-      <ellipse cx="210.0" cy="906.0" rx="320.0" ry="48.0" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
-      <ellipse cx="690.0" cy="954.0" rx="280.0" ry="42.0" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
-      <!-- 玻璃半透明叠层 -->
-      <rect x="50" y="870" width="800" height="120" fill="url(#glassFill)"/>
-      <!-- 顶部镜面高光 -->
-      <rect x="50" y="870" width="800" height="60.0" rx="22" fill="url(#glassHighlight)"/>
-    </g>
-
-    <rect x="50" y="870" width="800" height="120" rx="22" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="51.5" y="871.5" width="797" height="117" rx="20.5" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>
-<circle cx="76" cy="900" r="5" fill="#0A84FF" filter="url(#bloom)"/>
-<text x="92" y="906" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="16" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">离开锁屏休眠</text>
-<text x="220" y="906" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">Presence</text>
-<text x="76" y="950" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">离开锁屏</text>
-<rect x="210" y="934" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="222" y="954" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">300</text>
-<text x="300" y="954" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">秒</text>
-<text x="470" y="950" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#AEAEB2" fill-opacity="1.0" text-anchor="start">锁屏休眠</text>
-<rect x="610" y="934" width="80" height="30" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-<text x="622" y="954" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">300</text>
-<text x="700" y="954" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="400" fill="#636366" fill-opacity="1.0" text-anchor="start">秒</text>
-
-  <!-- 玻璃面板 @(50,1010) 800x90 -->
-  <defs>
-    <clipPath id="clip_50_1010_800_90">
-      <rect x="50" y="1010" width="800" height="90" rx="22"/>
-    </clipPath>
-  </defs>
-  <g filter="url(#dropShadow)">
-
-    <g clip-path="url(#clip_50_1010_800_90)">
-      <!-- 模糊的彩色背景 -->
-      <rect x="50" y="1010" width="800" height="90" fill="url(#wallpaperBase)"/>
-      <ellipse cx="210.0" cy="1037.0" rx="320.0" ry="36.0" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
-      <ellipse cx="690.0" cy="1073.0" rx="280.0" ry="31.499999999999996" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
-      <!-- 玻璃半透明叠层 -->
-      <rect x="50" y="1010" width="800" height="90" fill="url(#glassFill)"/>
-      <!-- 顶部镜面高光 -->
-      <rect x="50" y="1010" width="800" height="45.0" rx="22" fill="url(#glassHighlight)"/>
-    </g>
-
-    <rect x="50" y="1010" width="800" height="90" rx="22" fill="none"
-          stroke="url(#glassEdge)" stroke-width="1.5"/>
-    <rect x="51.5" y="1011.5" width="797" height="87" rx="20.5" fill="none"
-          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
-  </g>
-<circle cx="76" cy="1040" r="5" fill="#BF5AF2" filter="url(#bloom)"/>
-<text x="92" y="1046" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="16" font-weight="700" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">功能开关</text>
-<text x="76" y="1086" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">身后入侵守护</text>
-
-  <rect x="770" y="1072" width="50" height="30" rx="15" fill="#30D58C" opacity="0.85" filter="url(#dropShadowSm)"/>
-  <circle cx="796" cy="1087" r="12" fill="#ffffff" filter="url(#softGlow)"/>
-<text x="330" y="1086" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="500" fill="#F5F5F7" fill-opacity="1.0" text-anchor="start">注册表自启</text>
-
-  <rect x="510" y="1072" width="50" height="30" rx="15" fill="#30D58C" opacity="0.85" filter="url(#dropShadowSm)"/>
-  <circle cx="536" cy="1087" r="12" fill="#ffffff" filter="url(#softGlow)"/>
-<rect x="320" y="1130" width="260" height="46" rx="23" fill="url(#btnMint)" filter="url(#dropShadow)"/>
-<text x="450" y="1159" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="16" font-weight="700" fill="#0A1A12" fill-opacity="1.0" text-anchor="middle">保存设置</text>
+<rect width="900" height="1080" fill="url(#bgGrad)"/>
+<text x="50" y="80" font-family="Source Han Sans SC, sans-serif" font-size="28" font-weight="700" fill="#F5F5F7">FaceGuard</text>
+<text x="52" y="105" font-family="Source Han Sans SC, sans-serif" font-size="13" fill="#8E8E93">Settings · 人脸解锁守护</text>
+<text x="850" y="80" font-family="Source Han Sans SC, sans-serif" font-size="13" fill="#8E8E93" text-anchor="end">v2.1.2</text>
+<line x1="50" y1="120" x2="850" y2="120" stroke="#ffffff" stroke-opacity="0.08"/>
+<circle cx="60" cy="172" r="4" fill="#008CFF"/>
+<text x="74" y="177" font-family="Source Han Sans SC, sans-serif" font-size="15" font-weight="700" fill="#F5F5F7">识别引擎</text>
+<text x="60" y="222" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">置信度阈值</text>
+<rect x="220" y="210" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="227" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">0.55</text>
+<text x="370" y="227" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="#48484A">0.3–0.8</text>
+<text x="60" y="258" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">确认帧数</text>
+<rect x="220" y="246" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="263" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">3</text>
+<text x="370" y="263" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="#48484A">帧</text>
+<text x="60" y="294" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">摄像头序号</text>
+<rect x="220" y="282" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="299" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">0</text>
+<text x="60" y="330" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">识别帧率</text>
+<rect x="220" y="318" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="335" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">15 fps</text>
+<circle cx="60" cy="352" r="4" fill="#4DA8FF"/>
+<text x="74" y="357" font-family="Source Han Sans SC, sans-serif" font-size="15" font-weight="700" fill="#F5F5F7">识别模型</text>
+<rect x="60" y="380" width="260" height="80" rx="8" fill="#008CFF" fill-opacity="0.1" stroke="#008CFF" stroke-width="1.5"/>
+<circle cx="78" cy="400" r="3" fill="#008CFF"/>
+<text x="88" y="405" font-family="Source Han Sans SC, sans-serif" font-size="13" font-weight="600" fill="#fff">YuNet + SFace</text>
+<text x="78" y="428" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="#8E8E93">默认 · 99.5%</text>
+<text x="78" y="446" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="#48484A">38 MB</text>
+<rect x="320" y="380" width="260" height="80" rx="8" fill="#ffffff" fill-opacity="0.03" stroke="#ffffff" stroke-opacity="0.08"/>
+<circle cx="338" cy="400" r="3" fill="#8E8E93"/>
+<text x="348" y="405" font-family="Source Han Sans SC, sans-serif" font-size="13" font-weight="600" fill="#F5F5F7">MobileFaceNet</text>
+<text x="338" y="428" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="#8E8E93">轻量 · 99.0%</text>
+<text x="338" y="446" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="#48484A">5 MB</text>
+<rect x="580" y="380" width="260" height="80" rx="8" fill="#ffffff" fill-opacity="0.03" stroke="#ffffff" stroke-opacity="0.08"/>
+<circle cx="598" cy="400" r="3" fill="#8E8E93"/>
+<text x="608" y="405" font-family="Source Han Sans SC, sans-serif" font-size="13" font-weight="600" fill="#F5F5F7">ArcFace ResNet50</text>
+<text x="598" y="428" font-family="Source Han Sans SC, sans-serif" font-size="11" fill="#8E8E93">高精度 · 99.8%</text>
+<text x="598" y="446" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="#48484A">170 MB</text>
+<circle cx="60" cy="512" r="4" fill="#4DA8FF"/>
+<text x="74" y="517" font-family="Source Han Sans SC, sans-serif" font-size="15" font-weight="700" fill="#F5F5F7">自适应学习</text>
+<text x="60" y="562" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">每用户最多</text>
+<rect x="220" y="550" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="567" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">30</text>
+<text x="370" y="567" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="#48484A">个样本</text>
+<text x="60" y="598" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">冷却秒数</text>
+<rect x="220" y="586" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="603" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">300</text>
+<rect x="790" y="490" width="44" height="24" rx="12" fill="#008CFF"/>
+<circle cx="810" cy="502" r="9" fill="#fff"/>
+<text x="60" y="540" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#F5F5F7">成功解锁后增量学习</text>
+<text x="60" y="558" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="#48484A">程序自动记住你脸部变化（光线/角度/表情）</text>
+<circle cx="60" cy="642" r="4" fill="#FF9500"/>
+<text x="74" y="647" font-family="Source Han Sans SC, sans-serif" font-size="15" font-weight="700" fill="#F5F5F7">邮件告警</text>
+<text x="60" y="692" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">SMTP 服务器</text>
+<rect x="220" y="680" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="697" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">smtp.qq.com</text>
+<text x="60" y="728" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">发件邮箱</text>
+<rect x="220" y="716" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="733" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">1247053973@qq.com</text>
+<text x="60" y="764" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">授权码</text>
+<rect x="220" y="752" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="769" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">●●●●●●●●</text>
+<text x="60" y="800" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">告警冷却</text>
+<rect x="220" y="788" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="805" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">60</text>
+<text x="370" y="805" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="#48484A">秒</text>
+<circle cx="60" cy="842" r="4" fill="#008CFF"/>
+<text x="74" y="847" font-family="Source Han Sans SC, sans-serif" font-size="15" font-weight="700" fill="#F5F5F7">离开锁屏休眠</text>
+<text x="60" y="892" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">离开锁屏</text>
+<rect x="220" y="880" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="897" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">300</text>
+<text x="370" y="897" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="#48484A">秒</text>
+<text x="60" y="928" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#8E8E93">锁屏休眠</text>
+<rect x="220" y="916" width="140" height="26" rx="4" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.1"/>
+<text x="230" y="933" font-family="Source Han Sans SC, sans-serif" font-size="12" font-weight="600" fill="#F5F5F7">300</text>
+<text x="370" y="933" font-family="Source Han Sans SC, sans-serif" font-size="10" fill="#48484A">秒</text>
+<circle cx="60" cy="980" r="4" fill="#4DA8FF"/>
+<text x="74" y="985" font-family="Source Han Sans SC, sans-serif" font-size="15" font-weight="700" fill="#F5F5F7">功能开关</text>
+<text x="60" y="1020" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#F5F5F7">身后入侵守护</text>
+<rect x="790" y="1005" width="44" height="24" rx="12" fill="#008CFF"/>
+<circle cx="810" cy="1017" r="9" fill="#fff"/>
+<text x="300" y="1020" font-family="Source Han Sans SC, sans-serif" font-size="12" fill="#F5F5F7">注册表自启</text>
+<rect x="530" y="1005" width="44" height="24" rx="12" fill="#008CFF"/>
+<circle cx="550" cy="1017" r="9" fill="#fff"/>
+<rect x="350" y="1050" width="200" height="40" rx="20" fill="#008CFF"/>
+<text x="450" y="1075" font-family="Source Han Sans SC, sans-serif" font-size="14" font-weight="700" fill="#0A0A0E" text-anchor="middle">保存设置</text>
 </svg>

@@ -202,30 +202,25 @@ def config_ui(cfg: dict) -> None:
     import tkinter as tk
     from tkinter import messagebox
 
-    # 液态玻璃配色（Apple Liquid Glass 2025）
-    BG_DEEP = "#1A1033"          # 深紫壁纸底（macOS Sonoma 风格）
-    BG_PANEL = "#2A1F4E"         # 玻璃面板底
-    BG_PANEL_HOVER = "#3A2F5E"
-    ACCENT = "#30D58C"           # Apple 薄荷 #30D58C
-    ACCENT_DIM = "#28B574"
-    ACCENT_PURPLE = "#BF5AF2"    # Apple 紫
-    ACCENT_AMBER = "#FF9F0A"     # Apple 琥珀
-    ACCENT_BLUE = "#0A84FF"      # Apple 蓝
+    # 简洁配色（深色背景 + 激光蓝强调）
+    BG_DEEP = "#0A0A0E"          # 深黑背景
+    BG_PANEL = "#1C1C1E"         # 面板底
+    BG_PANEL_HOVER = "#2C2C2E"
+    ACCENT = "#008CFF"           # 激光蓝
+    ACCENT_DIM = "#0066CC"
+    ACCENT_PURPLE = "#4DA8FF"    # 激光蓝亮
+    ACCENT_AMBER = "#FF9500"     # 警告橙
+    ACCENT_BLUE = "#008CFF"      # 蓝
     TEXT_PRIMARY = "#F5F5F7"     # Apple 白
-    TEXT_SECONDARY = "#AEAEB2"   # 副文字
-    TEXT_HINT = "#636366"        # 提示
-    BORDER_GLOW = "#4A3A6E"
-    DANGER = "#FF453A"           # Apple 珊瑚红
+    TEXT_SECONDARY = "#8E8E93"   # 副文字
+    TEXT_HINT = "#48484A"        # 提示
+    BORDER_GLOW = "#2C2C2E"
+    DANGER = "#FF3B30"           # 红
 
     root = tk.Tk()
     root.title("FaceGuard · 设置")
     root.geometry("560x760")
     root.configure(bg=BG_DEEP)
-    # 无边框拖动 + 圆角（Windows 11 风格）
-    try:
-        root.attributes("-alpha", 0.98)
-    except tk.TclError:
-        pass
 
     # 字体：Windows 用 Microsoft YaHei UI（中英文兼优），其他平台回退
     _fn = "Microsoft YaHei UI" if sys.platform == "win32" else "Source Han Sans SC"

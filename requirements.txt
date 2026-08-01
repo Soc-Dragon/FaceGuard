@@ -1,0 +1,8 @@
+# FaceGuard Python 依赖
+# 极简依赖，全部有 Windows 预编译 wheel，无需 C 编译器
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# 仅构建期需要
+pyinstaller>=6.0.0

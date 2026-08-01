@@ -1,0 +1,126 @@
+"""配置管理：加载 / 保存 / 默认值。
+
+所有可调参数集中在这里，用户可通过编辑 config.json 或运行
+``python -m faceguard --config`` 调出设置面板修改。
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from copy import deepcopy
+from pathlib import Path
+
+# 运行期数据目录：C:\\Users\\<u>\\AppData\\Roaming\\FaceGuard
+APP_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "FaceGuard"
+APP_DIR.mkdir(parents=True, exist_ok=True)
+
+CONFIG_PATH = APP_DIR / "config.json"
+DATA_DIR = APP_DIR / "data"
+MODELS_DIR = APP_DIR / "models"
+LOG_DIR = APP_DIR / "logs"
+CAPTURE_DIR = APP_DIR / "captures"  # 识别失败时保存的人脸照片
+
+for _d in (DATA_DIR, MODELS_DIR, LOG_DIR, CAPTURE_DIR):
+    _d.mkdir(parents=True, exist_ok=True)
+
+# 默认配置 —— 所有数字均可在设置中由用户自行调整
+DEFAULTS = {
+    "version": "2.1.0",
+    # 识别引擎
+    "recognizer": {
+        "confidence_threshold": 0.55,   # SFace 余弦相似度阈值，>=0.5 即认定为本人
+        "confirm_frames": 3,            # 连续命中 N 帧才判定解锁，提升稳定性
+        "match_window": 5,              # 滑动窗口帧数
+        "camera_index": 0,             # 摄像头序号
+        "frame_width": 640,
+        "frame_height": 480,
+        "fps": 15,                      # 识别帧率，降低 CPU 占用
+    },
+    # 邮件告警（识别失败时抓拍并寄出）
+    "notify": {
+        "enabled": True,
+        "smtp_host": "smtp.qq.com",
+        "smtp_port": 465,
+        "smtp_ssl": True,
+        "sender": "1247053973@qq.com",
+        "password": "",                # QQ 邮箱授权码，非登录密码
+        "to": "1247053973@qq.com",
+        "cooldown_seconds": 60,        # 同一告警冷却，避免刷屏
+    },
+    # 身后入侵守护
+    "guardian": {
+        "enabled": True,
+        "multi_face_notify": True,     # 画面中出现 >1 张人脸即告警
+        "min_face_area_ratio": 0.015,  # 过滤太小的远处人脸噪点
+        "notify_sound": True,
+    },
+    # 离开锁屏休眠
+    "presence": {
+        "enabled": True,
+        "absence_lock_seconds": 300,   # 离开 5 分钟后锁屏
+        "sleep_after_seconds": 300,    # 锁屏后再 5 分钟未解锁则休眠
+        "no_face_threshold_seconds": 10, # 连续无脸 N 秒判定为离开
+    },
+    # 注册表常驻
+    "autostart": {
+        "enabled": True,
+        "registry_key": "FaceGuard",
+    },
+    # 识别画面 overlay
+    "overlay": {
+        "enabled": True,
+        "opacity": 0.9,
+        "show_landmarks": True,
+        "show_scanline": True,
+        "show_confidence": True,
+    },
+    # 安全解锁注入
+    "unlock": {
+        "method": "session_unlock",   # session_unlock | keep_unlocked
+    },
+    # 日志
+    "log": {
+        "level": "INFO",
+        "max_bytes": 1048576,
+        "backup_count": 7,
+    },
+}
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """递归合并：override 覆盖 base。"""
+    out = deepcopy(base)
+    for k, v in (override or {}).items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def load_config() -> dict:
+    """加载配置，缺失项用默认值补全。"""
+    cfg = deepcopy(DEFAULTS)
+    if CONFIG_PATH.exists():
+        try:
+            raw = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            cfg = _deep_merge(cfg, raw)
+        except (json.JSONDecodeError, OSError):
+            pass
+    cfg.setdefault("version", DEFAULTS["version"])
+    return cfg
+
+
+def save_config(cfg: dict) -> None:
+    """保存配置到磁盘。"""
+    CONFIG_PATH.write_text(
+        json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+
+def ensure_example_config(path: Path) -> None:
+    """把默认配置写成 config.example.json 供用户参考。"""
+    path.write_text(
+        json.dumps(DEFAULTS, indent=2, ensure_ascii=False), encoding="utf-8"
+    )

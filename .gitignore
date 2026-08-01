@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 构建产物
+build/
+dist/
+dist_setup/
+*.spec
+
+# 运行时数据
+*.onnx
+config.json
+faces.npz
+
+# IDE
+.vscode/
+.idea/

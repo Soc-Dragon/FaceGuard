@@ -1,0 +1,88 @@
+name: Build & Release
+
+# 推送 v* 标签时自动在 windows-latest 上编译 FaceGuard-Setup.exe 并发布到 Releases
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 创建 Release 所需
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 用 PyInstaller 打包 FaceGuard.exe
+        shell: pwsh
+        run: python build.py
+
+      - name: 验证 exe 产物
+        shell: pwsh
+        run: |
+          if (-not (Test-Path dist\FaceGuard.exe)) {
+            throw "未找到 dist\FaceGuard.exe，构建失败"
+          }
+          $size = (Get-Item dist\FaceGuard.exe).Length / 1MB
+          Write-Host "FaceGuard.exe 大小: $([math]::Round($size,2)) MB"
+
+      - name: 安装 Inno Setup 6
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+
+      - name: 用 Inno Setup 编译 Setup.exe
+        shell: pwsh
+        run: |
+          iscc release/FaceGuard.iss
+
+      - name: 验证 Setup 产物
+        shell: pwsh
+        run: |
+          if (-not (Test-Path dist_setup\FaceGuard-Setup.exe)) {
+            throw "未找到 dist_setup\FaceGuard-Setup.exe"
+          }
+          $size = (Get-Item dist_setup\FaceGuard-Setup.exe).Length / 1MB
+          Write-Host "FaceGuard-Setup.exe 大小: $([math]::Round($size,2)) MB"
+
+      - name: 上传 Setup.exe 到构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: FaceGuard-Setup
+          path: dist_setup/FaceGuard-Setup.exe
+
+      - name: 发布到 GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          name: FaceGuard ${{ github.ref_name }}
+          body: |
+            # FaceGuard ${{ github.ref_name }}
+
+            Windows Hello 人脸解锁替代程序。
+
+            ## 安装
+            1. 下载下方的 `FaceGuard-Setup.exe`
+            2. 双击安装
+            3. 从开始菜单运行「FaceGuard 注册人脸」完成首次采集
+
+            详见 [使用指南](https://github.com/Soc-Dragon/FaceGuard/blob/main/release/README_%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md)
+          files: |
+            dist_setup/FaceGuard-Setup.exe
+          draft: false
+          prerelease: false

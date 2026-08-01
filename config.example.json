@@ -1,0 +1,53 @@
+{
+  "version": "2.1.0",
+  "recognizer": {
+    "confidence_threshold": 0.55,
+    "confirm_frames": 3,
+    "match_window": 5,
+    "camera_index": 0,
+    "frame_width": 640,
+    "frame_height": 480,
+    "fps": 15
+  },
+  "notify": {
+    "enabled": true,
+    "smtp_host": "smtp.qq.com",
+    "smtp_port": 465,
+    "smtp_ssl": true,
+    "sender": "1247053973@qq.com",
+    "password": "在此填入QQ邮箱授权码",
+    "to": "1247053973@qq.com",
+    "cooldown_seconds": 60
+  },
+  "guardian": {
+    "enabled": true,
+    "multi_face_notify": true,
+    "min_face_area_ratio": 0.015,
+    "notify_sound": true
+  },
+  "presence": {
+    "enabled": true,
+    "absence_lock_seconds": 300,
+    "sleep_after_seconds": 300,
+    "no_face_threshold_seconds": 10
+  },
+  "autostart": {
+    "enabled": true,
+    "registry_key": "FaceGuard"
+  },
+  "overlay": {
+    "enabled": true,
+    "opacity": 0.9,
+    "show_landmarks": true,
+    "show_scanline": true,
+    "show_confidence": true
+  },
+  "unlock": {
+    "method": "session_unlock"
+  },
+  "log": {
+    "level": "INFO",
+    "max_bytes": 1048576,
+    "backup_count": 7
+  }
+}

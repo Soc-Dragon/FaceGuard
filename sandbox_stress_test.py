@@ -330,14 +330,169 @@ def t_main_version():
 
 @test("main: --silent 参数被接受")
 def t_main_silent():
-    # 不真正启动守护（无摄像头），只验证参数解析不报错
+    # 只验证参数解析不报错，不真启动守护（避免下载模型/开摄像头）
     import faceguard.__main__ as m
-    # 会因无摄像头返回 1，但不应因参数解析报错
+    import faceguard.camera as c_mod
+    orig_open = c_mod.Camera.open
     try:
+        c_mod.Camera.open = lambda self: False  # 模拟无摄像头，快速返回
         rc = m.main(["--silent"])
-        assert rc in (1, 2, 3, 0)  # 各种退出码都可，只要不抛异常
+        assert rc in (1, 2, 3, 0), f"异常退出码: {rc}"
     except SystemExit:
-        pass  # --version 之类会 sys.exit
+        pass
+    finally:
+        c_mod.Camera.open = orig_open
+
+
+# ========== 端到端流程测试（模拟全新安装到手使用）==========
+
+@test("e2e: 全新安装 silent 模式未注册 → 应弹窗引导而非静默退出")
+def t_e2e_silent_unenrolled():
+    """模拟双击桌面快捷方式（--silent）但未注册人脸的场景。
+    修复前：silent=True 跳过弹窗，直接 return 3，用户什么都没看到。
+    修复后：即使 silent 也弹窗引导注册。
+    """
+    import faceguard.__main__ as m
+    import faceguard.camera as c_mod
+    import faceguard.recognizer as r_mod
+    import tkinter
+    import tkinter.messagebox
+    orig_open = c_mod.Camera.open
+    orig_release = c_mod.Camera.release
+    orig_read = c_mod.Camera.read
+    orig_enroll = m.enroll_interactive
+    orig_init = r_mod.Recognizer.init_models
+    orig_has = r_mod.Recognizer.has_enrolled
+    orig_tk = tkinter.Tk
+    orig_askyesno = tkinter.messagebox.askyesno
+    try:
+        c_mod.Camera.open = lambda self: True
+        c_mod.Camera.release = lambda self: None
+        c_mod.Camera.read = lambda self: (False, None)
+        r_mod.Recognizer.init_models = lambda self: True
+        r_mod.Recognizer.has_enrolled = lambda self: False  # 未注册
+        # mock enroll 返回 False（用户取消注册）
+        m.enroll_interactive = lambda cfg, name=None: False
+        # mock tkinter 避免无 display 崩溃，模拟用户点"否"
+        class FakeRoot:
+            def withdraw(self): pass
+            def attributes(self, *a, **k): pass
+            def destroy(self): pass
+        tkinter.Tk = lambda: FakeRoot()
+        tkinter.messagebox.askyesno = lambda *a, **k: False
+        rc = m.run_guard({"recognizer": {"camera_index": 0}, "overlay": {},
+                          "guardian": {"enabled": False}, "presence": {},
+                          "notify": {}, "autostart": {"enabled": False}}, silent=True)
+        assert rc == 3, f"未注册应返回3, 实际 {rc}"
+    finally:
+        c_mod.Camera.open = orig_open
+        c_mod.Camera.release = orig_release
+        c_mod.Camera.read = orig_read
+        m.enroll_interactive = orig_enroll
+        r_mod.Recognizer.init_models = orig_init
+        r_mod.Recognizer.has_enrolled = orig_has
+        tkinter.Tk = orig_tk
+        tkinter.messagebox.askyesno = orig_askyesno
+
+
+@test("e2e: 注册成功后应递归重启守护")
+def t_e2e_enroll_then_guard():
+    """模拟未注册 → 引导弹窗 → 用户点是 → enroll 成功 → 递归重启守护。
+    递归第二次调用时 has_enrolled 返回 True，应进入守护主循环。
+    """
+    import faceguard.__main__ as m
+    import faceguard.camera as c_mod
+    import faceguard.enroll as e_mod
+    import faceguard.recognizer as r_mod
+    import tkinter
+    import tkinter.messagebox
+    call_count = {"has_enrolled": 0}
+    orig_open = c_mod.Camera.open
+    orig_release = c_mod.Camera.release
+    orig_read = c_mod.Camera.read
+    orig_enroll = e_mod.enroll_interactive
+    orig_has = r_mod.Recognizer.has_enrolled
+    orig_init = r_mod.Recognizer.init_models
+    orig_tk = tkinter.Tk
+    orig_askyesno = tkinter.messagebox.askyesno
+    try:
+        c_mod.Camera.open = lambda self: True
+        c_mod.Camera.release = lambda self: None
+        c_mod.Camera.read = lambda self: (False, None)
+        r_mod.Recognizer.init_models = lambda self: True
+        def fake_has(self):
+            call_count["has_enrolled"] += 1
+            return call_count["has_enrolled"] > 1
+        r_mod.Recognizer.has_enrolled = fake_has
+        e_mod.enroll_interactive = lambda cfg, name=None: True
+        m.enroll_interactive = lambda cfg, name=None: True  # 直接 mock __main__ 模块级引用
+        # mock tkinter 避免无 display 崩溃
+        class FakeRoot:
+            def withdraw(self): pass
+            def attributes(self, *a, **k): pass
+            def destroy(self): pass
+        tkinter.Tk = lambda: FakeRoot()
+        tkinter.messagebox.askyesno = lambda *a, **k: True
+        # 模拟 SIGTERM 立即停止主循环
+        import signal
+        orig_signal = signal.signal
+        def fake_signal(sig, handler):
+            if sig == signal.SIGTERM:
+                handler(sig, None)
+        signal.signal = fake_signal
+        rc = m.run_guard({"recognizer": {"camera_index": 0}, "overlay": {"enabled": False},
+                          "guardian": {"enabled": False}, "presence": {},
+                          "notify": {}, "autostart": {"enabled": False}}, silent=True)
+        assert call_count["has_enrolled"] >= 2, f"未递归重启: has_enrolled 调用 {call_count['has_enrolled']} 次"
+        assert rc == 0, f"递归后应返回0, 实际 {rc}"
+    finally:
+        c_mod.Camera.open = orig_open
+        c_mod.Camera.release = orig_release
+        c_mod.Camera.read = orig_read
+        e_mod.enroll_interactive = orig_enroll
+        r_mod.Recognizer.has_enrolled = orig_has
+        r_mod.Recognizer.init_models = orig_init
+        tkinter.Tk = orig_tk
+        tkinter.messagebox.askyesno = orig_askyesno
+        signal.signal = orig_signal
+
+
+@test("e2e: iss 快捷方式不带 --silent（手动启动有反馈）")
+def t_e2e_iss_shortcut():
+    """验证桌面/开始菜单快捷方式不再带 --silent，只有注册表自启带。"""
+    iss = Path(__file__).parent / "release" / "FaceGuard.iss"
+    content = iss.read_text(encoding="utf-8")
+    # 开始菜单主快捷方式不带 --silent
+    line49 = [l for l in content.splitlines() if '{group}\\FaceGuard"' in l and '注册' not in l and '设置' not in l and '卸载' not in l]
+    assert len(line49) == 1, f"主快捷方式行异常: {line49}"
+    assert "--silent" not in line49[0], f"主快捷方式仍带 --silent: {line49[0]}"
+    # 桌面快捷方式不带 --silent
+    desktop = [l for l in content.splitlines() if 'commondesktop' in l]
+    assert len(desktop) == 1
+    assert "--silent" not in desktop[0], f"桌面快捷方式仍带 --silent: {desktop[0]}"
+    # 注册表自启（install.bat）带 --silent
+    bat = (Path(__file__).parent / "release" / "install.bat").read_text(encoding="utf-8")
+    assert "--silent" in bat, "install.bat 自启应带 --silent"
+
+
+@test("e2e: iss [Files] 包含 install.bat 和 uninstall.bat")
+def t_e2e_iss_files():
+    content = (Path(__file__).parent / "release" / "FaceGuard.iss").read_text(encoding="utf-8")
+    assert 'install.bat"; DestDir' in content, "iss 未包含 install.bat"
+    assert 'uninstall.bat"; DestDir' in content, "iss 未包含 uninstall.bat"
+
+
+@test("e2e: install.bat 无 pause（不会卡死安装）")
+def t_e2e_install_no_pause():
+    bat = (Path(__file__).parent / "release" / "install.bat").read_text(encoding="utf-8")
+    assert "pause" not in bat.lower(), f"install.bat 仍有 pause:\n{bat}"
+
+
+@test("e2e: uninstall.bat 无 pause 无 set/p（不会卡死卸载）")
+def t_e2e_uninstall_no_pause():
+    bat = (Path(__file__).parent / "release" / "uninstall.bat").read_text(encoding="utf-8")
+    assert "pause" not in bat.lower(), f"uninstall.bat 仍有 pause"
+    assert "set /p" not in bat.lower(), f"uninstall.bat 仍有 set /p"
 
 
 # ========== 运行所有测试 ==========
@@ -357,6 +512,10 @@ if __name__ == "__main__":
         t_notifier_async, t_notifier_ms,
         t_guardian_owner,
         t_main_version, t_main_silent,
+        # 端到端流程测试
+        t_e2e_silent_unenrolled, t_e2e_enroll_then_guard,
+        t_e2e_iss_shortcut, t_e2e_iss_files,
+        t_e2e_install_no_pause, t_e2e_uninstall_no_pause,
     ]
     for t in tests:
         t()

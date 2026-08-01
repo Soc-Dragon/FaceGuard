@@ -46,17 +46,17 @@ Source: "install.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "uninstall.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\FaceGuard"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--silent"
+Name: "{group}\FaceGuard"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\FaceGuard 注册人脸"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--enroll"
 Name: "{group}\FaceGuard 设置"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--config"
 Name: "{group}\卸载 FaceGuard"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\FaceGuard"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--silent"; Tasks: desktopicon
+Name: "{commondesktop}\FaceGuard"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-; 安装后写入注册表自启项
+; 安装后写入注册表自启项（自启用 --silent，开机后台常驻）
 Filename: "{app}\install.bat"; Flags: runhidden waituntilterminated
-; 提示首次注册
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--enroll"; Description: "立即注册人脸"; Flags: postinstall nowait skipifsilent
+; 安装完成后引导首次注册（强制弹出，不跳过）
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--enroll"; Description: "立即注册人脸"; Flags: postinstall skipifsilent
 
 [UninstallRun]
 Filename: "{app}\uninstall.bat"; Flags: runhidden waituntilterminated

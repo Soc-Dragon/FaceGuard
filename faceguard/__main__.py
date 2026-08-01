@@ -120,8 +120,9 @@ def run_guard(cfg: dict, silent: bool = False) -> int:
     # silent 模式：关闭 overlay、降低日志、不弹对话框
     if silent:
         cfg.setdefault("overlay", {})["enabled"] = False
-        if cfg.get("log", {}).get("level", "INFO").upper() == "INFO":
-            cfg["log"]["level"] = "WARNING"
+        log_cfg = cfg.setdefault("log", {})
+        if log_cfg.get("level", "INFO").upper() == "INFO":
+            log_cfg["level"] = "WARNING"
 
     cam = Camera(rcfg.get("camera_index", 0),
                  rcfg.get("frame_width", 640),
@@ -160,26 +161,25 @@ def run_guard(cfg: dict, silent: bool = False) -> int:
     if not rec.has_enrolled():
         log.warning("尚未注册任何人脸！请先运行 --enroll 完成注册。")
         cam.release()
-        if not silent:
-            # 询问是否立即注册，注册成功后重启守护
-            try:
-                import tkinter as tk
-                from tkinter import messagebox
-                root = tk.Tk()
-                root.withdraw()
-                root.attributes("-topmost", True)
-                ans = messagebox.askyesno(
-                    "FaceGuard · 尚未注册人脸",
-                    "尚未注册任何人脸，守护无法启动。\n\n"
-                    "是否立即注册本人人脸？",
-                    parent=root,
-                )
-                root.destroy()
-                if ans and enroll_interactive(cfg):
-                    # 注册成功，递归重启守护
-                    return run_guard(cfg, silent)
-            except Exception as e:
-                log.error("无法启动注册引导: %s", e)
+        # 未注册是必须解决的首次设置，即使 silent 也弹窗引导（不能静默退出让用户无感）
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            ans = messagebox.askyesno(
+                "FaceGuard · 尚未注册人脸",
+                "尚未注册任何人脸，守护无法启动。\n\n"
+                "是否立即注册本人人脸？",
+                parent=root,
+            )
+            root.destroy()
+            if ans and enroll_interactive(cfg):
+                # 注册成功，递归重启守护（这次会跳过未注册分支）
+                return run_guard(cfg, silent)
+        except Exception as e:
+            log.error("无法启动注册引导: %s", e)
         return 3
 
     guardian = Guardian(cfg)

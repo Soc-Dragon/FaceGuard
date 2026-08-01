@@ -3,7 +3,7 @@
 ; 命令行编译：iscc.exe release\FaceGuard.iss
 
 #define MyAppName "FaceGuard"
-#define MyAppVersion "2.2.0"
+#define MyAppVersion "2.3.0"
 #define MyAppPublisher "Soc-Dragon"
 #define MyAppExeName "FaceGuard.exe"
 #define MyAppURL "https://github.com/Soc-Dragon/FaceGuard"

@@ -58,8 +58,9 @@ def t_config_corrupt():
     cfg_mod.CONFIG_PATH.write_text("{invalid json,,,}", encoding="utf-8")
     cfg = cfg_mod.load_config()
     assert cfg["recognizer"]["confidence_threshold"] == 0.55, "默认值未回退"
-    # 备份文件应存在
-    assert cfg_mod.CONFIG_PATH.with_suffix(".json.bak.corrupt").exists(), "未备份损坏配置"
+    # 备份文件应存在（文件名含时间戳）
+    baks = list(cfg_mod.CONFIG_PATH.parent.glob("config.json.bak.corrupt.*"))
+    assert len(baks) >= 1, "未备份损坏配置"
 
 
 @test("config: 数值字段为 null 应不崩溃")

@@ -37,7 +37,7 @@ def _ask_name_dialog() -> str:
         # tkinter 不可用时回退（有控制台的情况）
         try:
             return input("请输入你的名字（用于人脸标签）: ").strip() or "owner"
-        except EOFError:
+        except (EOFError, OSError, AttributeError):
             return "owner"
 
 
@@ -56,8 +56,9 @@ def _alert(title: str, message: str, icon: str = "warning") -> None:
         else:
             messagebox.showwarning(title, message, parent=root)
         root.destroy()
-    except Exception:
-        print(f"[{title}] {message}")
+    except Exception as e:
+        # --windowed 模式下 sys.stdout 可能为 None，用 log 替代 print
+        log.error("%s: %s (%s)", title, message, e)
 
 
 def enroll_interactive(cfg: dict, name: str | None = None) -> bool:
@@ -93,11 +94,23 @@ def enroll_interactive(cfg: dict, name: str | None = None) -> bool:
     angles = ["正面", "略左", "略右", "抬头", "低头", "左脸", "右脸", "正面"]
     angle_idx = 0
 
+    fail_count = 0
     while collected < target:
         ok, frame = cam.read()
         if not ok:
+            fail_count += 1
+            if fail_count > 100:
+                _alert("FaceGuard · 摄像头断开", "摄像头读取持续失败，注册已中止。", "error")
+                break
+            cv2.waitKey(30)  # 保持窗口响应，允许 ESC
+            try:
+                if cv2.getWindowProperty("FaceGuard Enroll", cv2.WND_PROP_VISIBLE) < 1:
+                    break
+            except cv2.error:
+                pass
             time.sleep(0.05)
             continue
+        fail_count = 0
         faces = rec.detect(frame)
         display = frame.copy()
         if faces:

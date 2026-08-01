@@ -67,7 +67,10 @@ def setup_logging(cfg: dict) -> None:
 def ensure_autostart(cfg: dict) -> None:
     acfg = cfg.get("autostart", {})
     if acfg.get("enabled", True):
-        from .locker import set_autostart, is_autostart_set
+        try:
+            from .locker import set_autostart, is_autostart_set
+        except ImportError:
+            from faceguard.locker import set_autostart, is_autostart_set
         key = acfg.get("registry_key", "FaceGuard")
         if not is_autostart_set(key):
             exe = current_executable()
@@ -83,6 +86,8 @@ def unlock_session(cfg: dict) -> None:
     可信会话激活（通过模拟用户输入唤醒显示 + 维持活跃），
     配合 --silent 常驻，使锁屏画面在确认本人后自动消失。
     """
+    if sys.platform != "win32":
+        return
     try:
         import ctypes
         # 唤醒显示器
@@ -91,7 +96,7 @@ def unlock_session(cfg: dict) -> None:
         ctypes.windll.user32.mouse_event(0x0001, 0, 0, 0, 0)
         log.info("已发起会话唤醒（keep_unlocked 策略）。")
     except Exception as e:
-        log.debug("会话唤醒失败: %s", e)
+        log.warning("会话唤醒失败: %s", e)
 
 
 def _alert_dialog(title: str, message: str, icon: str = "warning") -> None:
@@ -110,8 +115,8 @@ def _alert_dialog(title: str, message: str, icon: str = "warning") -> None:
             messagebox.showwarning(title, message, parent=root)
         root.destroy()
     except Exception:
-        # tkinter 不可用时回退到 print
-        print(f"[{title}] {message}")
+        # tkinter 不可用时写日志（--windowed 下 sys.stdout 为 None，不能用 print）
+        log.error("%s: %s", title, message)
 
 
 def run_guard(cfg: dict, silent: bool = False) -> int:
@@ -123,13 +128,14 @@ def run_guard(cfg: dict, silent: bool = False) -> int:
         log_cfg = cfg.setdefault("log", {})
         if log_cfg.get("level", "INFO").upper() == "INFO":
             log_cfg["level"] = "WARNING"
+            logging.getLogger().setLevel(logging.WARNING)
 
     cam = Camera(rcfg.get("camera_index", 0),
                  rcfg.get("frame_width", 640),
                  rcfg.get("frame_height", 480),
                  rcfg.get("fps", 15))
     if not cam.open():
-        log.error("摄像头打开失败，5 秒后重试...")
+        log.error("摄像头打开失败，程序退出（退出码 1）")
         if not silent:
             _alert_dialog(
                 "FaceGuard · 摄像头错误",
@@ -204,57 +210,62 @@ def run_guard(cfg: dict, silent: bool = False) -> int:
 
     try:
         while running["alive"]:
-            ok, frame = cam.read()
-            if not ok:
-                time.sleep(0.05)
-                continue
+            try:
+                ok, frame = cam.read()
+                if not ok:
+                    time.sleep(0.05)
+                    continue
 
-            faces = rec.detect(frame)
-            t = time.time()
-            owner_name, confidence = (None, 0.0)
-            biggest = max(faces, key=lambda x: x.area_ratio) if faces else None
+                faces = rec.detect(frame)
+                t = time.time()
+                owner_name, confidence = (None, 0.0)
+                biggest = max(faces, key=lambda x: x.area_ratio) if faces else None
 
-            if biggest and biggest.embedding is not None:
-                name, conf = rec.confirm_owner(biggest.embedding)
-                owner_name, confidence = name, conf
-                if name:
-                    # 确认是本人
-                    locked = is_workstation_locked()
-                    if locked:
-                        unlock_session(cfg)
-                        log.info("识别到本人 [%s] (相似度 %.3f)，发起解锁。",
-                                 name, conf)
-                    status = f"✓ 已识别: {name}  ({conf:.2f})"
+                # 缓存锁屏状态，避免每帧双调用 Win32 API
+                locked = is_workstation_locked()
+
+                if biggest and biggest.embedding is not None:
+                    name, conf = rec.confirm_owner(biggest.embedding)
+                    owner_name, confidence = name, conf
+                    if name:
+                        # 确认是本人
+                        if locked:
+                            unlock_session(cfg)
+                            log.info("识别到本人 [%s] (相似度 %.3f)，发起解锁。",
+                                     name, conf)
+                        status = f"✓ 已识别: {name}  ({conf:.2f})"
+                    else:
+                        # 最大脸是陌生人
+                        now = t
+                        if now - last_failed_alert > fail_cooldown:
+                            alert_recognition_failed(frame, cfg)
+                            last_failed_alert = now
+                        status = f"✗ 陌生人  ({conf:.2f})"
+                elif faces:
+                    status = "检测到人脸（特征提取中）"
                 else:
-                    # 最大脸是陌生人
-                    now = t
-                    if now - last_failed_alert > fail_cooldown:
-                        alert_recognition_failed(frame, cfg)
-                        last_failed_alert = now
-                    status = f"✗ 陌生人  ({conf:.2f})"
-            elif faces:
-                status = "检测到人脸（特征提取中）"
-            else:
-                status = "等待人脸..."
-                rec.reset_confirm()
+                    status = "等待人脸..."
+                    rec.reset_confirm()
 
-            # 身后守护
-            guardian.check(frame, faces, owner_name, cfg)
+                # 身后守护
+                guardian.check(frame, faces, owner_name, cfg)
 
-            # 离开检测
-            presence.update(bool(faces), cfg)
+                # 离开检测
+                presence.update(bool(faces), cfg)
 
-            # overlay 渲染
-            if cfg.get("overlay", {}).get("enabled", True):
-                display = frame.copy()
-                render_overlay(display, faces, owner_name, confidence,
-                               status, cfg, t)
-                overlay.update_frame(display)
-                overlay.show()
-
-            # 锁屏时降低 overlay 干扰
-            if is_workstation_locked() and not owner_name:
-                overlay.hide()
+                # overlay 渲染（锁屏且无主人时隐藏，避免 show/hide 竞态闪烁）
+                if cfg.get("overlay", {}).get("enabled", True):
+                    display = frame.copy()
+                    render_overlay(display, faces, owner_name, confidence,
+                                   status, cfg, t)
+                    overlay.update_frame(display)
+                    if locked and not owner_name:
+                        overlay.hide()
+                    else:
+                        overlay.show()
+            except Exception:
+                log.exception("单帧处理异常，跳过该帧")
+                time.sleep(0.05)
 
     finally:
         overlay.stop()
@@ -470,19 +481,30 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.version:
-        print(f"FaceGuard v{__version__}")
+        # --windowed 下 sys.stdout 可能为 None，用 _alert_dialog 替代 print
+        _alert_dialog("FaceGuard", f"FaceGuard v{__version__}", "info")
         return 0
 
     cfg = load_config()
     setup_logging(cfg)
 
     if args.config:
-        config_ui(cfg)
+        try:
+            config_ui(cfg)
+        except Exception as e:
+            log.exception("设置面板异常")
+            _alert_dialog("FaceGuard · 设置面板错误", f"无法打开设置面板：\n{e}", "error")
+            return 1
         return 0
 
     if args.enroll:
-        ok = enroll_interactive(cfg)
-        return 0 if ok else 1
+        try:
+            ok = enroll_interactive(cfg)
+            return 0 if ok else 1
+        except Exception as e:
+            log.exception("注册异常")
+            _alert_dialog("FaceGuard · 注册错误", f"注册过程出错：\n{e}", "error")
+            return 1
 
     # 默认：启动守护
     try:

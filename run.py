@@ -11,4 +11,20 @@ from faceguard.__main__ import main
 
 if __name__ == "__main__":
     import sys
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except Exception as e:
+        # --windowed 模式下 stderr 为 None，尝试弹窗反馈
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            messagebox.showerror("FaceGuard · 致命错误", f"程序遇到错误：\n{e}", parent=root)
+            root.destroy()
+        except Exception:
+            pass
+        sys.exit(1)

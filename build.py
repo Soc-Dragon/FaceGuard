@@ -112,6 +112,9 @@ def build() -> int:
         "--collect-all", "numpy",
         "--collect-all", "PIL",
         "--hidden-import", "PIL.ImageTk",
+        "--hidden-import", "ctypes.wintypes",
+        "--hidden-import", "tkinter.messagebox",
+        "--hidden-import", "tkinter.simpledialog",
     ] + add_data_args + [
         str(ENTRY),
     ]

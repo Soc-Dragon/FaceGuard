@@ -30,12 +30,12 @@ MODEL_URLS = {
     # MobileFaceNet - 轻量级识别（更小更快，精度略低）
     "face_recognition_mobilefacenet.onnx": [
         "https://github.com/onnx/models/raw/main/validated/vision/body_analysis/arcface/model/mobilefacenet-9c9db7fc.onnx",
-        "https://raw.githubusercontent.com/onnx/models/main/validated/vision/body_analysis/arcface/model/mobilefacenet-9c9db7fc.onnx",
+        "https://media.githubusercontent.com/media/onnx/models/main/validated/vision/body_analysis/arcface/model/mobilefacenet-9c9db7fc.onnx",
     ],
     # ArcFace - 高精度识别（模型更大，精度更高）
     "face_recognition_arcface.onnx": [
         "https://github.com/onnx/models/raw/main/validated/vision/body_analysis/arcface/model/resnet50-face-featurizer-v1.onnx",
-        "https://raw.githubusercontent.com/onnx/models/main/validated/vision/body_analysis/arcface/model/resnet50-face-featurizer-v1.onnx",
+        "https://media.githubusercontent.com/media/onnx/models/main/validated/vision/body_analysis/arcface/model/resnet50-face-featurizer-v1.onnx",
     ],
 }
 
@@ -85,24 +85,14 @@ def _ensure_dir(path: Path) -> bool:
 
 
 def _safe_open_write(path: Path):
-    """安全打开文件写入，绝不返回 None。"""
     try:
         if not isinstance(path, Path):
             return None
-        # 确保父目录存在
         parent = path.parent
         if not _ensure_dir(parent):
-            # 兜底：用 APP_DIR
-            if _ensure_dir(APP_DIR):
-                path = APP_DIR / path.name
-            else:
-                return None
-        # 路径合法性检查
-        s = str(path)
-        if not s or s == "." or s.startswith("\\\\"):
-            return None
+            return None  # 不再静默改路径
         return open(path, "wb")
-    except (OSError, PermissionError, ValueError, TypeError):
+    except Exception:
         return None
 
 
@@ -150,6 +140,12 @@ def _download_one(url: str, dest: Path, label: str = "") -> bool:
             f.close()
             return False
 
+        # 防御: 拒绝 HTML 错误页（GitHub LFS pointer、CDN 拦截页等）
+        ctype = resp.headers.get("Content-Type", "")
+        if "text/html" in ctype or "text/plain" in ctype:
+            print(f"[FaceGuard] {dest.name} 下载被拒绝（Content-Type: {ctype}），可能是错误页。", flush=True)
+            return False
+
         total = 0
         try:
             total = int(resp.headers.get("Content-Length", 0))
@@ -158,10 +154,12 @@ def _download_one(url: str, dest: Path, label: str = "") -> bool:
 
         done = 0
         chunk = 64 * 1024
+        interrupted = False
         while True:
             try:
                 buf = resp.read(chunk)
             except Exception:
+                interrupted = True
                 break
             if not buf:
                 break
@@ -175,8 +173,8 @@ def _download_one(url: str, dest: Path, label: str = "") -> bool:
                 sys.stdout.write(f"\r  {done // 1024} / {total // 1024} KB  ({pct}%)")
                 sys.stdout.flush()
 
-        # 防御 7: 下载量必须 > 0
-        if done == 0:
+        # 防御 7: 下载量必须 > 0 且未被中断
+        if interrupted or done == 0:
             f.close()
             try:
                 dest.unlink()
@@ -238,7 +236,11 @@ def _ensure_model_file(target: Path) -> bool:
         try:
             if b.exists() and b.stat().st_size > 1000:
                 import shutil
-                shutil.copy2(b, target)
+                shutil.copy(b, target)
+                try:
+                    target.chmod(0o644)
+                except OSError:
+                    pass
                 print(f"[FaceGuard] 从安装包复制 {target.name} 到用户目录。", flush=True)
                 return True
         except OSError:
@@ -268,7 +270,8 @@ def ensure_models(recognizer_type: str = "sface") -> tuple[Path, Path | None]:
     # YuNet 检测器是必须的
     yunet_ok = _ensure_model_file(YUNET_PATH)
     if not yunet_ok:
-        print("[FaceGuard] YuNet 检测模型加载失败。", flush=True)
+        print("[FaceGuard] YuNet 检测模型加载失败，无法进行人脸检测。", flush=True)
+        return YUNET_PATH, None
 
     # 根据用户选择加载对应识别模型
     rec_info = RECOGNIZER_MODELS.get(recognizer_type, RECOGNIZER_MODELS["sface"])

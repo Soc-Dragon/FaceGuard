@@ -128,25 +128,12 @@ def _face_mesh_points(face) -> list[tuple[float, float]]:
 
 # ---------- 激光点绘制 ----------
 
-def _draw_laser_dot(frame, x: float, y: float, color=COLOR_LASER,
-                    core_r: int = 1, glow_r: int = 5, glow_alpha: float = 0.35) -> None:
-    """绘制单个激光点：中心亮白 + 外圈蓝色光晕。"""
-    xi, yi = int(x), int(y)
-    H, W = frame.shape[:2]
-    if xi < -glow_r or yi < -glow_r or xi >= W + glow_r or yi >= H + glow_r:
-        return
-    # 外圈光晕（alpha 叠加）
-    if glow_r > 0:
-        overlay = frame.copy()
-        cv2.circle(overlay, (xi, yi), glow_r, color, -1, cv2.LINE_AA)
-        cv2.addWeighted(overlay, glow_alpha, frame, 1 - glow_alpha, 0, frame)
-    # 中心核心
-    cv2.circle(frame, (xi, yi), core_r, COLOR_LASER_CORE, -1, cv2.LINE_AA)
-
 
 def _draw_laser_mesh(frame, face, color=COLOR_LASER, t: float | None = None) -> None:
     """绘制蓝色激光点阵（面部轮廓 + 五官）。"""
     pts = _face_mesh_points(face)
+    if not pts:
+        return
     t = t if t is not None else time.time()
     pulse = 0.85 + 0.15 * (math.sin(t * 3) * 0.5 + 0.5)
     H, W = frame.shape[:2]
@@ -166,16 +153,16 @@ def _draw_laser_mesh(frame, face, color=COLOR_LASER, t: float | None = None) -> 
 
 # ---------- 简洁 UI 组件 ----------
 
-def _draw_scan_line(frame, face, t: float) -> None:
+def _draw_scan_line(frame, face, t: float, color=COLOR_LASER) -> None:
     """简洁扫描线：单条蓝色横线，上下移动。"""
     progress = (math.sin(t * 1.6) + 1) / 2
     ly = int(face.y + progress * face.h)
     cv2.line(frame, (face.x, ly), (face.x + face.w, ly),
-             COLOR_LASER, 1, cv2.LINE_AA)
+             color, 1, cv2.LINE_AA)
     # 微光带
     overlay = frame.copy()
     cv2.line(overlay, (face.x, ly), (face.x + face.w, ly),
-             COLOR_LASER, 3, cv2.LINE_AA)
+             color, 3, cv2.LINE_AA)
     cv2.addWeighted(overlay, 0.2, frame, 0.8, 0, frame)
 
 
@@ -251,11 +238,12 @@ def render_overlay(frame, faces, owner_name, confidence, status: str,
     show_scan = ocfg.get("show_scanline", True)
     show_conf = ocfg.get("show_confidence", True)
 
-    top_color = COLOR_OWNER  # 默认蓝
-    # 找最大脸索引
+    top_color = COLOR_OWNER
     biggest_idx = max(range(len(faces)), key=lambda i: faces[i].area_ratio) if faces else -1
     for idx, face in enumerate(faces):
         is_owner = (idx == biggest_idx) and owner_name is not None
+        if not is_owner:
+            top_color = COLOR_STRANGER
         color = COLOR_OWNER if is_owner else COLOR_STRANGER
         label = owner_name if is_owner else "Unknown"
 
@@ -267,7 +255,7 @@ def render_overlay(frame, faces, owner_name, confidence, status: str,
 
         # 扫描线（识别中时显示）
         if show_scan and not is_owner:
-            _draw_scan_line(frame, face, t)
+            _draw_scan_line(frame, face, t, color)
 
         # 标签
         _draw_label(frame, face, label, color,

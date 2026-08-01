@@ -20,22 +20,21 @@ class OverlayWindow:
     """tkinter 置顶窗口，显示识别画面。"""
 
     def __init__(self, title: str = "FaceGuard", width: int = 640, height: int = 480):
+        self.title = title
         self.width = width
         self.height = height
         self._root = None
         self._label = None
         self._photo = None
-        self._lock = threading.Lock()
-        self._visible = False
         self._tk_thread = None
         self._ready = threading.Event()
         self._stopping = False
 
     def _build(self):
-        import tkinter as tk
         try:
+            import tkinter as tk
             self._root = tk.Tk()
-            self._root.title("FaceGuard 识别画面")
+            self._root.title(self.title)
             self._root.overrideredirect(True)  # 无边框
             # 居中靠右上
             sw = self._root.winfo_screenwidth()
@@ -50,7 +49,12 @@ class OverlayWindow:
             self._root.withdraw()  # 默认隐藏
         except Exception as e:
             log.error("overlay 窗口构建失败: %s", e)
-            self._root = None
+            if self._root is not None:
+                try:
+                    self._root.destroy()
+                except Exception:
+                    pass
+                self._root = None
         finally:
             self._ready.set()
 
@@ -64,21 +68,36 @@ class OverlayWindow:
     def _run_tk(self):
         try:
             self._build()
-            self._root.mainloop()
+            if self._root is not None:
+                self._root.mainloop()
         except Exception as e:
             log.error("overlay 窗口异常: %s", e)
 
     def show(self):
-        if self._root is None:
+        root = self._root
+        if root is None or self._stopping:
             return
-        self._root.after(0, lambda: self._root.deiconify())
-        self._visible = True
+        def _show():
+            if self._stopping:
+                return
+            try:
+                root.deiconify()
+            except Exception:
+                pass
+        root.after(0, _show)
 
     def hide(self):
-        if self._root is None:
+        root = self._root
+        if root is None or self._stopping:
             return
-        self._root.after(0, lambda: self._root.withdraw())
-        self._visible = False
+        def _hide():
+            if self._stopping:
+                return
+            try:
+                root.withdraw()
+            except Exception:
+                pass
+        root.after(0, _hide)
 
     def update_frame(self, frame_bgr: np.ndarray):
         """推送一帧到窗口（线程安全）。"""
@@ -104,9 +123,12 @@ class OverlayWindow:
 
     def stop(self):
         self._stopping = True
-        if self._root is not None:
+        root = self._root
+        self._root = None
+        if root is not None:
             try:
-                self._root.after(0, self._root.destroy)
+                root.after(0, root.destroy)
             except Exception:
                 pass
-            self._root = None
+        if self._tk_thread is not None and self._tk_thread.is_alive():
+            self._tk_thread.join(timeout=2.0)

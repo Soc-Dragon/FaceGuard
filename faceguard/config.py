@@ -132,11 +132,14 @@ def _deep_merge(base: dict, override: dict) -> dict:
         if isinstance(v, dict) and isinstance(out.get(k), dict):
             out[k] = _deep_merge(out[k], v)
         else:
-            # 类型校验：如果默认值是数值，强制转换 override
             default_val = out.get(k)
-            if isinstance(default_val, (int, float)) and not isinstance(default_val, bool):
+            if isinstance(default_val, bool):
+                # bool 字段只接受 bool
+                out[k] = v if isinstance(v, bool) else default_val
+            elif isinstance(default_val, (int, float)):
+                # 数值字段做类型转换
                 if isinstance(v, bool):
-                    out[k] = default_val  # bool 不覆盖数值
+                    out[k] = default_val
                 elif isinstance(v, (int, float)):
                     out[k] = v
                 else:
@@ -144,6 +147,9 @@ def _deep_merge(base: dict, override: dict) -> dict:
                         out[k] = type(default_val)(v)
                     except (TypeError, ValueError):
                         out[k] = default_val
+            elif isinstance(default_val, str):
+                # 字符串字段只接受 str
+                out[k] = v if isinstance(v, str) else default_val
             else:
                 out[k] = v
     return out
@@ -160,7 +166,8 @@ def load_config() -> dict:
             # 备份损坏的配置
             try:
                 import shutil
-                bak = CONFIG_PATH.with_suffix(".json.bak.corrupt")
+                import time
+                bak = CONFIG_PATH.with_suffix(f".json.bak.corrupt.{int(time.time())}")
                 shutil.copy2(CONFIG_PATH, bak)
             except OSError:
                 pass
@@ -171,13 +178,15 @@ def load_config() -> dict:
 
 
 def save_config(cfg: dict) -> bool:
-    """保存配置到磁盘，返回是否成功。"""
+    import os
     try:
-        CONFIG_PATH.write_text(
+        tmp = CONFIG_PATH.with_suffix(".json.tmp")
+        tmp.write_text(
             json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8"
         )
+        os.replace(tmp, CONFIG_PATH)
         return True
-    except (OSError, PermissionError) as e:
+    except (OSError, PermissionError, TypeError, ValueError) as e:
         print(f"[FaceGuard] 配置保存失败: {e}", flush=True)
         return False
 

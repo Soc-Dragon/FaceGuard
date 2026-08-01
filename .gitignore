@@ -20,3 +20,6 @@ faces.npz
 # IDE
 .vscode/
 .idea/
+
+# 字体文件（系统已安装，无需入库）
+fonts/

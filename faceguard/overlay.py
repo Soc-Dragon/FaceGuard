@@ -19,13 +19,19 @@ import cv2
 import numpy as np
 
 
-# ---------- 液态玻璃配色（BGR，模拟苹果系统色）----------
-COLOR_OWNER = (120, 230, 180)       # 本人 - 液态薄荷绿
-COLOR_STRANGER = (110, 110, 255)    # 陌生人 - 液态红
-COLOR_INTRUDER = (90, 180, 255)     # 入侵 - 液态橙
+# ---------- 液态玻璃配色（BGR，Apple 系统色 2025）----------
+# Apple Liquid Glass palette: mint #30D58C · coral #FF453A · amber #FF9F0A · blue #0A84FF · purple #BF5AF2
+COLOR_OWNER = (140, 213, 48)        # 本人 - Apple 薄荷 #30D58C
+COLOR_OWNER_LT = (181, 234, 94)     # 薄荷亮 #5EEAB5
+COLOR_STRANGER = (58, 69, 255)      # 陌生人 - Apple 珊瑚 #FF453A
+COLOR_STRANGER_LT = (122, 129, 255) # 珊瑚亮 #FF817A
+COLOR_INTRUDER = (10, 159, 255)     # 入侵 - Apple 琥珀 #FF9F0A
+COLOR_INTRUDER_LT = (71, 191, 255)  # 琥珀亮 #FFBF47
+COLOR_INFO = (255, 132, 10)         # 信息 - Apple 蓝 #0A84FF
+COLOR_PURPLE = (242, 90, 191)       # 模型 - Apple 紫 #BF5AF2
 COLOR_GLASS_EDGE = (255, 255, 255)  # 玻璃边 - 白
 COLOR_HIGHLIGHT = (255, 255, 255)   # 高光
-COLOR_TEXT = (255, 255, 255)
+COLOR_TEXT = (245, 245, 247)        # Apple 白 #F5F5F7
 COLOR_TEXT_SHADOW = (0, 0, 0)
 
 

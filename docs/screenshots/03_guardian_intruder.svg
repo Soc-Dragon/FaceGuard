@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+
+<defs>
+  <!-- ═══ 真实毛玻璃滤镜（背景模糊） ═══ -->
+  <filter id="glassBlur" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="14"/>
+  </filter>
+  <filter id="glassBlurLg" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="28"/>
+  </filter>
+  <filter id="glassBlurSm" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="6"/>
+  </filter>
+
+  <!-- ═══ 镜面高光滤镜（边缘折射） ═══ -->
+  <filter id="specular" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>
+    <feSpecularLighting in="blur" surfaceScale="5" specularConstant="0.9"
+                        specularExponent="25" lighting-color="#ffffff" result="spec">
+      <feDistantLight azimuth="225" elevation="55"/>
+    </feSpecularLighting>
+    <feComposite in="spec" in2="SourceAlpha" operator="in" result="specOut"/>
+    <feComposite in="SourceGraphic" in2="specOut" operator="arithmetic"
+                 k1="0" k2="1" k3="0.8" k4="0"/>
+  </filter>
+
+  <!-- ═══ 液态折射滤镜（微扭曲） ═══ -->
+  <filter id="liquidRefract" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.018"
+                  numOctaves="2" seed="3" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="6"
+                       xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+
+  <!-- ═══ 发光 / 泛光滤镜 ═══ -->
+  <filter id="bloom" x="-50%" y="-50%" width="200%" height="200%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+    <feMerge>
+      <feMergeNode in="blur"/>
+      <feMergeNode in="blur"/>
+      <feMergeNode in="SourceGraphic"/>
+    </feMerge>
+  </filter>
+  <filter id="bloomStrong" x="-80%" y="-80%" width="260%" height="260%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
+    <feMerge>
+      <feMergeNode in="blur"/>
+      <feMergeNode in="blur"/>
+      <feMergeNode in="blur"/>
+      <feMergeNode in="SourceGraphic"/>
+    </feMerge>
+  </filter>
+  <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+    <feMerge>
+      <feMergeNode in="blur"/>
+      <feMergeNode in="SourceGraphic"/>
+    </feMerge>
+  </filter>
+
+  <!-- ═══ 背景壁纸渐变（macOS Sonoma 风格彩色网格） ═══ -->
+  <linearGradient id="wallpaperBase" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%"  stop-color="#1A1033"/>
+    <stop offset="35%" stop-color="#2D1B4E"/>
+    <stop offset="65%" stop-color="#1E1A3D"/>
+    <stop offset="100%" stop-color="#0D0F1E"/>
+  </linearGradient>
+
+  <!-- 彩色光斑 -->
+  <radialGradient id="blobPurple" cx="50%" cy="50%" r="50%">
+    <stop offset="0%"  stop-color="#BF5AF2" stop-opacity="0.7"/>
+    <stop offset="100%" stop-color="#BF5AF2" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="blobPink" cx="50%" cy="50%" r="50%">
+    <stop offset="0%"  stop-color="#FF375F" stop-opacity="0.55"/>
+    <stop offset="100%" stop-color="#FF375F" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="blobOrange" cx="50%" cy="50%" r="50%">
+    <stop offset="0%"  stop-color="#FF9F0A" stop-opacity="0.5"/>
+    <stop offset="100%" stop-color="#FF9F0A" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="blobBlue" cx="50%" cy="50%" r="50%">
+    <stop offset="0%"  stop-color="#0A84FF" stop-opacity="0.5"/>
+    <stop offset="100%" stop-color="#0A84FF" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="blobMint" cx="50%" cy="50%" r="50%">
+    <stop offset="0%"  stop-color="#30D58C" stop-opacity="0.4"/>
+    <stop offset="100%" stop-color="#30D58C" stop-opacity="0"/>
+  </radialGradient>
+
+  <!-- ═══ 玻璃面板材质 ═══ -->
+  <linearGradient id="glassFill" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.14"/>
+    <stop offset="50%" stop-color="#ffffff" stop-opacity="0.06"/>
+    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.03"/>
+  </linearGradient>
+  <linearGradient id="glassHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.35"/>
+    <stop offset="30%" stop-color="#ffffff" stop-opacity="0.08"/>
+    <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="glassEdge" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.4"/>
+    <stop offset="50%" stop-color="#ffffff" stop-opacity="0.1"/>
+    <stop offset="100%" stop-color="#ffffff" stop-opacity="0.25"/>
+  </linearGradient>
+
+  <!-- ═══ 强调色按钮渐变 ═══ -->
+  <linearGradient id="btnMint" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%"  stop-color="#5EEAB5"/>
+    <stop offset="100%" stop-color="#28B574"/>
+  </linearGradient>
+  <linearGradient id="btnPurple" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%"  stop-color="#D070FF"/>
+    <stop offset="100%" stop-color="#9B30DC"/>
+  </linearGradient>
+
+  <!-- ═══ 流光边框（彩虹渐变） ═══ -->
+  <linearGradient id="rainbowBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%"   stop-color="#30D58C"/>
+    <stop offset="25%"  stop-color="#5EEAB5"/>
+    <stop offset="50%"  stop-color="#0A84FF"/>
+    <stop offset="75%"  stop-color="#BF5AF2"/>
+    <stop offset="100%" stop-color="#FF375F"/>
+  </linearGradient>
+
+  <!-- ═══ 扫描线渐变 ═══ -->
+  <linearGradient id="scanGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%"   stop-color="#5EEAB5" stop-opacity="0"/>
+    <stop offset="50%"  stop-color="#5EEAB5" stop-opacity="1"/>
+    <stop offset="100%" stop-color="#5EEAB5" stop-opacity="0"/>
+  </linearGradient>
+
+  <!-- ═══ 阴影滤镜 ═══ -->
+  <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.4"/>
+  </filter>
+  <filter id="dropShadowSm" x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.3"/>
+  </filter>
+  <filter id="txtShadow" x="-50%" y="-50%" width="200%" height="200%">
+    <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.6"/>
+  </filter>
+</defs>
+
+
+  <!-- 深色底 -->
+  <rect width="800" height="600" fill="url(#wallpaperBase)"/>
+  <!-- 彩色光斑（大模糊，模拟渐变网格） -->
+  <ellipse cx="120.0" cy="120.0" rx="280.0" ry="210.0" fill="url(#blobPurple)" filter="url(#glassBlurLg)"/>
+  <ellipse cx="680.0" cy="90.0" rx="240.0" ry="180.0" fill="url(#blobPink)" filter="url(#glassBlurLg)"/>
+  <ellipse cx="640.0" cy="480.0" rx="280.0" ry="210.0" fill="url(#blobOrange)" filter="url(#glassBlurLg)"/>
+  <ellipse cx="160.0" cy="510.0" rx="240.0" ry="180.0" fill="url(#blobBlue)" filter="url(#glassBlurLg)"/>
+  <ellipse cx="400.0" cy="300.0" rx="200.0" ry="150.0" fill="url(#blobMint)" filter="url(#glassBlurLg)"/>
+  <!-- 微粒噪点（模拟壁纸纹理） -->
+  <rect width="800" height="600" fill="url(#wallpaperBase)" opacity="0.15"/>
+
+
+  <rect x="30" y="30" width="740" height="540" rx="28" fill="#000000" opacity="0.25" filter="url(#dropShadow)"/>
+
+  <!-- 本人（左侧，安全） -->
+  
+  <ellipse cx="250" cy="260.0" rx="55.0" ry="70.0" fill="#3A3A5C" opacity="0.7"/>
+  <path d="M175.0,370.0 Q175.0,310.0 250,310.0 Q325.0,310.0 325.0,370.0 Z" fill="#3A3A5C" opacity="0.7"/>
+  
+  <defs>
+    <radialGradient id="halo_3" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#30D58C" stop-opacity="0.4"/>
+      <stop offset="40%" stop-color="#30D58C" stop-opacity="0.16000000000000003"/>
+      <stop offset="100%" stop-color="#30D58C" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="250" cy="270" r="120" fill="url(#halo_3)" filter="url(#bloomStrong)"/>
+  <circle cx="250" cy="270" r="80" fill="none" stroke="#30D58C" stroke-width="2" stroke-opacity="0.9" filter="url(#softGlow)"/>
+<circle cx="250" cy="270" r="88" fill="none" stroke="#30D58C" stroke-width="2" stroke-opacity="0.5" filter="url(#softGlow)"/>
+<circle cx="250" cy="270" r="98" fill="none" stroke="#30D58C" stroke-width="2" stroke-opacity="0.25" filter="url(#softGlow)"/>
+<circle cx="250" cy="270" r="110" fill="none" stroke="#30D58C" stroke-width="2" stroke-opacity="0.1" filter="url(#softGlow)"/>
+  <rect x="170" y="190" width="160" height="170" rx="18" fill="none" stroke="#30D58C" stroke-width="2.5" filter="url(#bloom)"/>
+  <!-- 关键点连线 -->
+<line x1="220.0" y1="255.0" x2="280.0" y2="255.0" stroke="#5EEAB5" stroke-width="1" stroke-opacity="0.35"/>
+<line x1="280.0" y1="255.0" x2="250" y2="275.0" stroke="#5EEAB5" stroke-width="1" stroke-opacity="0.35"/>
+<line x1="250" y1="275.0" x2="228.0" y2="305.0" stroke="#5EEAB5" stroke-width="1" stroke-opacity="0.35"/>
+<line x1="250" y1="275.0" x2="272.0" y2="305.0" stroke="#5EEAB5" stroke-width="1" stroke-opacity="0.35"/>
+<line x1="228.0" y1="305.0" x2="272.0" y2="305.0" stroke="#5EEAB5" stroke-width="1" stroke-opacity="0.35"/>
+<!-- 发光关键点 -->
+<circle cx="220.0" cy="255.0" r="8" fill="#5EEAB5" opacity="0.25" filter="url(#bloom)"/>
+<circle cx="220.0" cy="255.0" r="3" fill="#ffffff" filter="url(#softGlow)"/>
+<circle cx="280.0" cy="255.0" r="8" fill="#5EEAB5" opacity="0.25" filter="url(#bloom)"/>
+<circle cx="280.0" cy="255.0" r="3" fill="#ffffff" filter="url(#softGlow)"/>
+<circle cx="250" cy="275.0" r="8" fill="#5EEAB5" opacity="0.25" filter="url(#bloom)"/>
+<circle cx="250" cy="275.0" r="3" fill="#ffffff" filter="url(#softGlow)"/>
+<circle cx="228.0" cy="305.0" r="8" fill="#5EEAB5" opacity="0.25" filter="url(#bloom)"/>
+<circle cx="228.0" cy="305.0" r="3" fill="#ffffff" filter="url(#softGlow)"/>
+<circle cx="272.0" cy="305.0" r="8" fill="#5EEAB5" opacity="0.25" filter="url(#bloom)"/>
+<circle cx="272.0" cy="305.0" r="3" fill="#ffffff" filter="url(#softGlow)"/>
+
+  <!-- 入侵者（右侧，警告） -->
+  
+  <ellipse cx="560" cy="228.5" rx="57.75" ry="73.5" fill="#5C3A1A" opacity="0.7"/>
+  <path d="M481.25,344.0 Q481.25,281.0 560,281.0 Q638.75,281.0 638.75,344.0 Z" fill="#5C3A1A" opacity="0.7"/>
+  
+  <defs>
+    <radialGradient id="halo_4" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#FF9F0A" stop-opacity="0.5"/>
+      <stop offset="40%" stop-color="#FF9F0A" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#FF9F0A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="560" cy="240" r="130" fill="url(#halo_4)" filter="url(#bloomStrong)"/>
+  <circle cx="560" cy="240" r="90" fill="none" stroke="#FF9F0A" stroke-width="2.5" stroke-opacity="0.9" filter="url(#softGlow)"/>
+<circle cx="560" cy="240" r="98" fill="none" stroke="#FF9F0A" stroke-width="2.5" stroke-opacity="0.5" filter="url(#softGlow)"/>
+<circle cx="560" cy="240" r="108" fill="none" stroke="#FF9F0A" stroke-width="2.5" stroke-opacity="0.25" filter="url(#softGlow)"/>
+<circle cx="560" cy="240" r="120" fill="none" stroke="#FF9F0A" stroke-width="2.5" stroke-opacity="0.1" filter="url(#softGlow)"/>
+  <rect x="475" y="155" width="170" height="180" rx="18" fill="none" stroke="#FF9F0A" stroke-width="3" filter="url(#bloom)"/>
+  <!-- 关键点连线 -->
+<line x1="528.5" y1="224.25" x2="591.5" y2="224.25" stroke="#FFBF47" stroke-width="1" stroke-opacity="0.35"/>
+<line x1="591.5" y1="224.25" x2="560" y2="245.25" stroke="#FFBF47" stroke-width="1" stroke-opacity="0.35"/>
+<line x1="560" y1="245.25" x2="536.9" y2="276.75" stroke="#FFBF47" stroke-width="1" stroke-opacity="0.35"/>
+<line x1="560" y1="245.25" x2="583.1" y2="276.75" stroke="#FFBF47" stroke-width="1" stroke-opacity="0.35"/>
+<line x1="536.9" y1="276.75" x2="583.1" y2="276.75" stroke="#FFBF47" stroke-width="1" stroke-opacity="0.35"/>
+<!-- 发光关键点 -->
+<circle cx="528.5" cy="224.25" r="8" fill="#FFBF47" opacity="0.25" filter="url(#bloom)"/>
+<circle cx="528.5" cy="224.25" r="3" fill="#ffffff" filter="url(#softGlow)"/>
+<circle cx="591.5" cy="224.25" r="8" fill="#FFBF47" opacity="0.25" filter="url(#bloom)"/>
+<circle cx="591.5" cy="224.25" r="3" fill="#ffffff" filter="url(#softGlow)"/>
+<circle cx="560" cy="245.25" r="8" fill="#FFBF47" opacity="0.25" filter="url(#bloom)"/>
+<circle cx="560" cy="245.25" r="3" fill="#ffffff" filter="url(#softGlow)"/>
+<circle cx="536.9" cy="276.75" r="8" fill="#FFBF47" opacity="0.25" filter="url(#bloom)"/>
+<circle cx="536.9" cy="276.75" r="3" fill="#ffffff" filter="url(#softGlow)"/>
+<circle cx="583.1" cy="276.75" r="8" fill="#FFBF47" opacity="0.25" filter="url(#bloom)"/>
+<circle cx="583.1" cy="276.75" r="3" fill="#ffffff" filter="url(#softGlow)"/>
+
+  <!-- 中间连接线（检测关系） -->
+  <line x1="330" y1="280" x2="475" y2="250" stroke="#FF9F0A" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.5" filter="url(#bloom)"/>
+  <text x="400" y="250" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="700" fill="#FFBF47" fill-opacity="1.0" text-anchor="middle" filter="url(#txtShadow)">身后检测</text>
+
+  <!-- 顶部状态 -->
+  
+  <!-- 玻璃面板 @(30,40) 300x52 -->
+  <defs>
+    <clipPath id="clip_30_40_300_52">
+      <rect x="30" y="40" width="300" height="52" rx="26"/>
+    </clipPath>
+  </defs>
+  <g filter="url(#dropShadow)">
+
+    <g clip-path="url(#clip_30_40_300_52)">
+      <!-- 模糊的彩色背景 -->
+      <rect x="30" y="40" width="300" height="52" fill="url(#wallpaperBase)"/>
+      <ellipse cx="90.0" cy="55.6" rx="120.0" ry="20.8" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
+      <ellipse cx="270.0" cy="76.4" rx="105.0" ry="18.2" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
+      <!-- 玻璃半透明叠层 -->
+      <rect x="30" y="40" width="300" height="52" fill="url(#glassFill)"/>
+      <!-- 顶部镜面高光 -->
+      <rect x="30" y="40" width="300" height="26.0" rx="26" fill="url(#glassHighlight)"/>
+    </g>
+
+    <rect x="30" y="40" width="300" height="52" rx="26" fill="none"
+          stroke="url(#glassEdge)" stroke-width="1.5"/>
+    <rect x="31.5" y="41.5" width="297" height="49" rx="24.5" fill="none"
+          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+  </g>
+  <circle cx="56" cy="66" r="6" fill="#FF9F0A" filter="url(#bloom)"/>
+  <text x="72" y="71" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="17" font-weight="700" fill="#FFFFFF" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">FaceGuard</text>
+  <text x="186" y="71" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="500" fill="#FFBF47" fill-opacity="1.0" text-anchor="start">守护警告</text>
+
+  
+  <!-- 玻璃面板 @(440,40) 330x52 -->
+  <defs>
+    <clipPath id="clip_440_40_330_52">
+      <rect x="440" y="40" width="330" height="52" rx="26"/>
+    </clipPath>
+  </defs>
+  <g filter="url(#dropShadow)">
+
+    <g clip-path="url(#clip_440_40_330_52)">
+      <!-- 模糊的彩色背景 -->
+      <rect x="440" y="40" width="330" height="52" fill="url(#wallpaperBase)"/>
+      <ellipse cx="506.0" cy="55.6" rx="132.0" ry="20.8" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
+      <ellipse cx="704.0" cy="76.4" rx="115.49999999999999" ry="18.2" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
+      <!-- 玻璃半透明叠层 -->
+      <rect x="440" y="40" width="330" height="52" fill="url(#glassFill)"/>
+      <!-- 顶部镜面高光 -->
+      <rect x="440" y="40" width="330" height="26.0" rx="26" fill="url(#glassHighlight)"/>
+    </g>
+
+    <rect x="440" y="40" width="330" height="52" rx="26" fill="none"
+          stroke="url(#glassEdge)" stroke-width="1.5"/>
+    <rect x="441.5" y="41.5" width="327" height="49" rx="24.5" fill="none"
+          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+  </g>
+  <text x="460" y="71" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="13" font-weight="700" fill="#FFBF47" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">身后出现 1 人</text>
+  <text x="750" y="71" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="11" font-weight="500" fill="#5EEAB5" fill-opacity="1.0" text-anchor="end">已邮件告警</text>
+
+  <!-- 底部状态 -->
+  
+  <!-- 玻璃面板 @(30,520) 740x50 -->
+  <defs>
+    <clipPath id="clip_30_520_740_50">
+      <rect x="30" y="520" width="740" height="50" rx="18"/>
+    </clipPath>
+  </defs>
+  <g filter="url(#dropShadow)">
+
+    <g clip-path="url(#clip_30_520_740_50)">
+      <!-- 模糊的彩色背景 -->
+      <rect x="30" y="520" width="740" height="50" fill="url(#wallpaperBase)"/>
+      <ellipse cx="178.0" cy="535.0" rx="296.0" ry="20.0" fill="url(#blobPurple)" filter="url(#glassBlur)"/>
+      <ellipse cx="622.0" cy="555.0" rx="259.0" ry="17.5" fill="url(#blobBlue)" filter="url(#glassBlur)"/>
+      <!-- 玻璃半透明叠层 -->
+      <rect x="30" y="520" width="740" height="50" fill="url(#glassFill)"/>
+      <!-- 顶部镜面高光 -->
+      <rect x="30" y="520" width="740" height="25.0" rx="18" fill="url(#glassHighlight)"/>
+    </g>
+
+    <rect x="30" y="520" width="740" height="50" rx="18" fill="none"
+          stroke="url(#glassEdge)" stroke-width="1.5"/>
+    <rect x="31.5" y="521.5" width="737" height="47" rx="16.5" fill="none"
+          stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+  </g>
+  <circle cx="58" cy="545" r="5" fill="#FF9F0A" filter="url(#bloom)"/>
+  <text x="74" y="550" font-family="Source Han Sans SC, Noto Sans CJK SC, sans-serif" font-size="15" font-weight="700" fill="#FFBF47" fill-opacity="1.0" text-anchor="start" filter="url(#txtShadow)">⚠ 守护模式 · 检测到身后他人</text>
+</svg>

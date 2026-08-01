@@ -202,21 +202,24 @@ def config_ui(cfg: dict) -> None:
     import tkinter as tk
     from tkinter import messagebox
 
-    # 液态玻璃配色
-    BG_DEEP = "#0A0E1A"          # 深空蓝背景
-    BG_PANEL = "#1A1F35"         # 玻璃面板底
-    BG_PANEL_HOVER = "#242B45"
-    ACCENT = "#64E6B5"           # 液态薄荷强调
-    ACCENT_DIM = "#3DA888"
-    TEXT_PRIMARY = "#F0F4FF"
-    TEXT_SECONDARY = "#8B92A8"
-    TEXT_HINT = "#5A6178"
-    BORDER_GLOW = "#3A4570"
-    DANGER = "#FF6B8A"
+    # 液态玻璃配色（Apple Liquid Glass 2025）
+    BG_DEEP = "#1A1033"          # 深紫壁纸底（macOS Sonoma 风格）
+    BG_PANEL = "#2A1F4E"         # 玻璃面板底
+    BG_PANEL_HOVER = "#3A2F5E"
+    ACCENT = "#30D58C"           # Apple 薄荷 #30D58C
+    ACCENT_DIM = "#28B574"
+    ACCENT_PURPLE = "#BF5AF2"    # Apple 紫
+    ACCENT_AMBER = "#FF9F0A"     # Apple 琥珀
+    ACCENT_BLUE = "#0A84FF"      # Apple 蓝
+    TEXT_PRIMARY = "#F5F5F7"     # Apple 白
+    TEXT_SECONDARY = "#AEAEB2"   # 副文字
+    TEXT_HINT = "#636366"        # 提示
+    BORDER_GLOW = "#4A3A6E"
+    DANGER = "#FF453A"           # Apple 珊瑚红
 
     root = tk.Tk()
     root.title("FaceGuard · 设置")
-    root.geometry("560x720")
+    root.geometry("560x760")
     root.configure(bg=BG_DEEP)
     # 无边框拖动 + 圆角（Windows 11 风格）
     try:
@@ -224,11 +227,13 @@ def config_ui(cfg: dict) -> None:
     except tk.TclError:
         pass
 
-    FONT_TITLE = ("Segoe UI Semibold", 22)
-    FONT_SECTION = ("Segoe UI Semibold", 13)
-    FONT_LABEL = ("Segoe UI", 10)
-    FONT_VALUE = ("Segoe UI", 10)
-    FONT_HINT = ("Segoe UI", 9)
+    # 字体：Windows 用 Microsoft YaHei UI（中英文兼优），其他平台回退
+    _fn = "Microsoft YaHei UI" if sys.platform == "win32" else "Source Han Sans SC"
+    FONT_TITLE = (_fn, 22, "bold")
+    FONT_SECTION = (_fn, 13, "bold")
+    FONT_LABEL = (_fn, 10)
+    FONT_VALUE = (_fn, 10)
+    FONT_HINT = (_fn, 9)
 
     # 顶部标题区
     header = tk.Frame(root, bg=BG_DEEP)
@@ -382,9 +387,9 @@ def config_ui(cfg: dict) -> None:
     btn_frame = tk.Frame(root, bg=BG_DEEP)
     btn_frame.pack(fill="x", padx=20, pady=14)
     save_btn = tk.Button(btn_frame, text="  保存设置  ", command=save,
-                         font=("Segoe UI Semibold", 12), fg="#0A0E1A",
+                         font=(_fn, 12, "bold"), fg="#0A1A12",
                          bg=ACCENT, activebackground=ACCENT_DIM,
-                         activeforeground="#0A0E1A", relief="flat", bd=0,
+                         activeforeground="#0A1A12", relief="flat", bd=0,
                          cursor="hand2", padx=30, pady=10)
     save_btn.pack()
 

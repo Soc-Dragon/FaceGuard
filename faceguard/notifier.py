@@ -22,8 +22,13 @@ _last_sent = 0.0
 
 def save_capture(frame, prefix: str = "intruder") -> Path | None:
     """保存一帧抓拍图，返回路径。frame 为 OpenCV BGR 图像。"""
+    if frame is None:
+        return None
     try:
-        import cv2  # 延迟导入，避免非 Windows 环境报错
+        import cv2
+        # 防御：空数组会让 cv2 抛 assertion 并刷错误日志
+        if not hasattr(frame, "size") or frame.size == 0:
+            return None
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = CAPTURE_DIR / f"{prefix}_{ts}.jpg"
         cv2.imwrite(str(path), frame, [cv2.IMWRITE_JPEG_QUALITY, 85])

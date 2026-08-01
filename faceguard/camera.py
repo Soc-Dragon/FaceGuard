@@ -38,20 +38,29 @@ class Camera:
         return True
 
     def read(self):
-        """按 fps 节流读帧，返回 (success, frame)。"""
+        """按 fps 节流读帧，返回 (success, frame)。断线自动重连。"""
         if not self.cap or not self.cap.isOpened():
-            return False, None
+            # 断线重连：尝试重新打开
+            log.warning("摄像头已断开，尝试重连...")
+            if not self.open():
+                return False, None
         now = time.time()
         if self._frame_interval and (now - self._last_read) < self._frame_interval:
-            # 跳过过快的读取，但仍要 grab 以清空缓冲
             self.cap.grab()
             return False, None
         self._last_read = now
-        for _ in range(3):  # 重试几次
+        for _ in range(3):
             ok, frame = self.cap.read()
             if ok and frame is not None:
                 return True, frame
             time.sleep(0.05)
+        # 连续 3 次读失败，释放以便下次重连
+        log.warning("摄像头读帧失败，将重连。")
+        try:
+            self.cap.release()
+        except Exception:
+            pass
+        self.cap = None
         return False, None
 
     def release(self) -> None:

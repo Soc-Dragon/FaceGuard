@@ -198,82 +198,148 @@ def run_guard(cfg: dict) -> None:
 
 
 def config_ui(cfg: dict) -> None:
-    """简易设置面板（tkinter）。"""
+    """液态玻璃风格设置面板（tkinter）。"""
     import tkinter as tk
-    from tkinter import ttk, messagebox
+    from tkinter import messagebox
+
+    # 液态玻璃配色
+    BG_DEEP = "#0A0E1A"          # 深空蓝背景
+    BG_PANEL = "#1A1F35"         # 玻璃面板底
+    BG_PANEL_HOVER = "#242B45"
+    ACCENT = "#64E6B5"           # 液态薄荷强调
+    ACCENT_DIM = "#3DA888"
+    TEXT_PRIMARY = "#F0F4FF"
+    TEXT_SECONDARY = "#8B92A8"
+    TEXT_HINT = "#5A6178"
+    BORDER_GLOW = "#3A4570"
+    DANGER = "#FF6B8A"
 
     root = tk.Tk()
-    root.title("FaceGuard 设置")
-    root.geometry("520x620")
+    root.title("FaceGuard · 设置")
+    root.geometry("560x720")
+    root.configure(bg=BG_DEEP)
+    # 无边框拖动 + 圆角（Windows 11 风格）
+    try:
+        root.attributes("-alpha", 0.98)
+    except tk.TclError:
+        pass
 
-    def section(parent, title):
-        f = tk.LabelFrame(parent, text=title, padx=10, pady=8)
-        f.pack(fill="x", padx=10, pady=5)
-        return f
+    FONT_TITLE = ("Segoe UI Semibold", 22)
+    FONT_SECTION = ("Segoe UI Semibold", 13)
+    FONT_LABEL = ("Segoe UI", 10)
+    FONT_VALUE = ("Segoe UI", 10)
+    FONT_HINT = ("Segoe UI", 9)
 
-    # 识别
-    rf = section(root, "识别引擎")
-    tk.Label(rf, text="置信度阈值 (0.3-0.8):").grid(row=0, column=0, sticky="w")
-    e_thr = tk.Entry(rf, width=10)
-    e_thr.insert(0, str(cfg["recognizer"]["confidence_threshold"]))
-    e_thr.grid(row=0, column=1)
-    tk.Label(rf, text="确认帧数:").grid(row=1, column=0, sticky="w")
-    e_cf = tk.Entry(rf, width=10)
-    e_cf.insert(0, str(cfg["recognizer"]["confirm_frames"]))
-    e_cf.grid(row=1, column=1)
-    tk.Label(rf, text="摄像头序号:").grid(row=2, column=0, sticky="w")
-    e_cam = tk.Entry(rf, width=10)
-    e_cam.insert(0, str(cfg["recognizer"]["camera_index"]))
-    e_cam.grid(row=2, column=1)
+    # 顶部标题区
+    header = tk.Frame(root, bg=BG_DEEP)
+    header.pack(fill="x", padx=24, pady=(20, 4))
+    tk.Label(header, text="FaceGuard", font=FONT_TITLE,
+             fg=ACCENT, bg=BG_DEEP).pack(anchor="w")
+    tk.Label(header, text="液态玻璃 · 人脸解锁守护", font=FONT_HINT,
+             fg=TEXT_HINT, bg=BG_DEEP).pack(anchor="w")
 
-    # 邮件
-    nf = section(root, "邮件告警")
-    tk.Label(nf, text="SMTP 服务器:").grid(row=0, column=0, sticky="w")
-    e_host = tk.Entry(nf, width=25)
-    e_host.insert(0, cfg["notify"]["smtp_host"])
-    e_host.grid(row=0, column=1)
-    tk.Label(nf, text="发件邮箱:").grid(row=1, column=0, sticky="w")
-    e_sender = tk.Entry(nf, width=25)
-    e_sender.insert(0, cfg["notify"]["sender"])
-    e_sender.grid(row=1, column=1)
-    tk.Label(nf, text="授权码:").grid(row=2, column=0, sticky="w")
-    e_pwd = tk.Entry(nf, width=25, show="*")
-    e_pwd.insert(0, cfg["notify"]["password"])
-    e_pwd.grid(row=2, column=1)
-    tk.Label(nf, text="收件邮箱:").grid(row=3, column=0, sticky="w")
-    e_to = tk.Entry(nf, width=25)
-    e_to.insert(0, cfg["notify"]["to"])
-    e_to.grid(row=3, column=1)
-    tk.Label(nf, text="冷却秒数:").grid(row=4, column=0, sticky="w")
-    e_cd = tk.Entry(nf, width=10)
-    e_cd.insert(0, str(cfg["notify"]["cooldown_seconds"]))
-    e_cd.grid(row=4, column=1)
+    # 内容滚动容器
+    canvas = tk.Canvas(root, bg=BG_DEEP, highlightthickness=0, bd=0)
+    scroll = tk.Scrollbar(root, orient="vertical", command=canvas.yview,
+                          troughcolor=BG_DEEP, bg=BG_PANEL)
+    canvas.configure(yscrollcommand=scroll.set)
+    scroll.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True, padx=(0, 0))
+    content = tk.Frame(canvas, bg=BG_DEEP)
+    canvas.create_window((0, 0), window=content, anchor="nw", width=540)
+    def _resize(e):
+        canvas.itemconfig("all", width=e.width)
+    canvas.bind("<Configure>", _resize)
 
-    # 离开锁屏休眠
-    pf = section(root, "离开锁屏休眠")
-    tk.Label(pf, text="离开后锁屏(秒):").grid(row=0, column=0, sticky="w")
-    e_lock = tk.Entry(pf, width=10)
-    e_lock.insert(0, str(cfg["presence"]["absence_lock_seconds"]))
-    e_lock.grid(row=0, column=1)
-    tk.Label(pf, text="锁屏后休眠(秒):").grid(row=1, column=0, sticky="w")
-    e_sleep = tk.Entry(pf, width=10)
-    e_sleep.insert(0, str(cfg["presence"]["sleep_after_seconds"]))
-    e_sleep.grid(row=1, column=1)
+    def glass_section(parent, title, subtitle=""):
+        """液态玻璃分区：深色圆角面板 + 强调色标题条。"""
+        wrap = tk.Frame(parent, bg=BG_DEEP)
+        wrap.pack(fill="x", padx=20, pady=6)
+        panel = tk.Frame(wrap, bg=BG_PANEL, bd=0, highlightbackground=BORDER_GLOW,
+                         highlightthickness=1)
+        panel.pack(fill="x")
+        # 标题条
+        head = tk.Frame(panel, bg=BG_PANEL)
+        head.pack(fill="x", padx=16, pady=(10, 0))
+        # 强调色小圆点
+        dot = tk.Canvas(head, width=8, height=8, bg=BG_PANEL, highlightthickness=0)
+        dot.create_oval(0, 0, 8, 8, fill=ACCENT, outline="")
+        dot.pack(side="left", padx=(0, 8))
+        tk.Label(head, text=title, font=FONT_SECTION,
+                 fg=TEXT_PRIMARY, bg=BG_PANEL).pack(side="left")
+        if subtitle:
+            tk.Label(head, text=subtitle, font=FONT_HINT,
+                     fg=TEXT_HINT, bg=BG_PANEL).pack(side="left", padx=8)
+        body = tk.Frame(panel, bg=BG_PANEL)
+        body.pack(fill="x", padx=16, pady=(8, 14))
+        return body
 
-    # 守护 / 自启
-    gf = section(root, "其它")
+    def glass_entry(parent, label, value, width=18, show=None, hint=""):
+        """标签 + 输入框 行。"""
+        row = tk.Frame(parent, bg=BG_PANEL)
+        row.pack(fill="x", pady=4)
+        tk.Label(row, text=label, font=FONT_LABEL, fg=TEXT_SECONDARY,
+                 bg=BG_PANEL, width=16, anchor="w").pack(side="left")
+        e = tk.Entry(row, font=FONT_VALUE, fg=TEXT_PRIMARY, bg=BG_DEEP,
+                     insertbackground=ACCENT, relief="flat", width=width,
+                     show=show, bd=0, highlightbackground=BORDER_GLOW,
+                     highlightthickness=1, highlightcolor=ACCENT)
+        e.insert(0, str(value))
+        e.pack(side="left", ipady=5, padx=4)
+        e.config(justify="left")
+        if hint:
+            tk.Label(row, text=hint, font=FONT_HINT, fg=TEXT_HINT,
+                     bg=BG_PANEL).pack(side="left", padx=4)
+        return e
+
+    def glass_toggle(parent, label, var):
+        """液态开关（Checkbutton 美化）。"""
+        row = tk.Frame(parent, bg=BG_PANEL)
+        row.pack(fill="x", pady=3)
+        cb = tk.Checkbutton(row, text=label, font=FONT_LABEL, fg=TEXT_PRIMARY,
+                            bg=BG_PANEL, selectcolor=BG_DEEP, activebackground=BG_PANEL,
+                            activeforeground=ACCENT, variable=var, anchor="w",
+                            relief="flat", highlightthickness=0)
+        cb.pack(anchor="w")
+
+    # === 识别引擎 ===
+    rb = glass_section(content, "识别引擎", "Recognition")
+    e_thr = glass_entry(rb, "置信度阈值", cfg["recognizer"]["confidence_threshold"],
+                        width=10, hint="0.3-0.8")
+    e_cf = glass_entry(rb, "确认帧数", cfg["recognizer"]["confirm_frames"], width=10)
+    e_cam = glass_entry(rb, "摄像头序号", cfg["recognizer"]["camera_index"], width=10)
+    e_fps = glass_entry(rb, "识别帧率", cfg["recognizer"].get("fps", 15), width=10, hint="fps")
+
+    # === 邮件告警 ===
+    nb = glass_section(content, "邮件告警", "失败抓拍 / 入侵提醒")
+    e_host = glass_entry(nb, "SMTP 服务器", cfg["notify"]["smtp_host"], width=22)
+    e_sender = glass_entry(nb, "发件邮箱", cfg["notify"]["sender"], width=22)
+    e_pwd = glass_entry(nb, "授权码", cfg["notify"]["password"], width=22, show="●", hint="非登录密码")
+    e_to = glass_entry(nb, "收件邮箱", cfg["notify"]["to"], width=22)
+    e_cd = glass_entry(nb, "冷却秒数", cfg["notify"]["cooldown_seconds"], width=10)
+
+    # === 离开锁屏休眠 ===
+    pb = glass_section(content, "离开锁屏休眠", "Presence")
+    e_lock = glass_entry(pb, "离开锁屏(秒)", cfg["presence"]["absence_lock_seconds"], width=10)
+    e_sleep = glass_entry(pb, "锁屏休眠(秒)", cfg["presence"]["sleep_after_seconds"], width=10)
+    e_nf = glass_entry(pb, "无脸判定(秒)", cfg["presence"]["no_face_threshold_seconds"], width=10)
+
+    # === 开关 ===
+    gb = glass_section(content, "功能开关", "Toggles")
     var_guard = tk.BooleanVar(value=cfg["guardian"]["enabled"])
-    tk.Checkbutton(gf, text="身后入侵守护", variable=var_guard).pack(anchor="w")
+    glass_toggle(gb, "身后入侵守护", var_guard)
     var_auto = tk.BooleanVar(value=cfg["autostart"]["enabled"])
-    tk.Checkbutton(gf, text="注册表开机自启", variable=var_auto).pack(anchor="w")
+    glass_toggle(gb, "注册表开机自启", var_auto)
     var_overlay = tk.BooleanVar(value=cfg["overlay"]["enabled"])
-    tk.Checkbutton(gf, text="显示识别画面叠加", variable=var_overlay).pack(anchor="w")
+    glass_toggle(gb, "识别画面液态玻璃叠加", var_overlay)
 
+    # === 保存按钮（液态强调）===
     def save():
         try:
             cfg["recognizer"]["confidence_threshold"] = float(e_thr.get())
             cfg["recognizer"]["confirm_frames"] = int(e_cf.get())
             cfg["recognizer"]["camera_index"] = int(e_cam.get())
+            cfg["recognizer"]["fps"] = int(e_fps.get())
             cfg["notify"]["smtp_host"] = e_host.get().strip()
             cfg["notify"]["sender"] = e_sender.get().strip()
             cfg["notify"]["password"] = e_pwd.get().strip()
@@ -281,6 +347,7 @@ def config_ui(cfg: dict) -> None:
             cfg["notify"]["cooldown_seconds"] = int(e_cd.get())
             cfg["presence"]["absence_lock_seconds"] = int(e_lock.get())
             cfg["presence"]["sleep_after_seconds"] = int(e_sleep.get())
+            cfg["presence"]["no_face_threshold_seconds"] = int(e_nf.get())
             cfg["guardian"]["enabled"] = var_guard.get()
             cfg["autostart"]["enabled"] = var_auto.get()
             cfg["overlay"]["enabled"] = var_overlay.get()
@@ -289,8 +356,18 @@ def config_ui(cfg: dict) -> None:
         except Exception as ex:
             messagebox.showerror("错误", str(ex))
 
-    tk.Button(root, text="保存设置", command=save, bg="#4CAF50",
-              fg="white", height=2).pack(fill="x", padx=20, pady=10)
+    btn_frame = tk.Frame(root, bg=BG_DEEP)
+    btn_frame.pack(fill="x", padx=20, pady=14)
+    save_btn = tk.Button(btn_frame, text="  保存设置  ", command=save,
+                         font=("Segoe UI Semibold", 12), fg="#0A0E1A",
+                         bg=ACCENT, activebackground=ACCENT_DIM,
+                         activeforeground="#0A0E1A", relief="flat", bd=0,
+                         cursor="hand2", padx=30, pady=10)
+    save_btn.pack()
+
+    # 更新滚动区域
+    content.update_idletasks()
+    canvas.configure(scrollregion=canvas.bbox("all"))
     root.mainloop()
 
 

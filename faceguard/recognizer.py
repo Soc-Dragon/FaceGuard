@@ -145,17 +145,19 @@ class Recognizer:
         return best_name, best_score
 
     def confirm_owner(self, embedding: np.ndarray) -> tuple[str | None, float]:
-        """多帧确认：连续命中 confirm_frames 次才放行。"""
+        """多帧确认：最近 confirm_frames 帧全部命中才放行（更严格，防误判）。
+
+        与"窗口内累计命中数"相比，"连续命中"能避免
+        陌生人 / 本人交替出现时累积误解锁。
+        """
         name, score = self.match(embedding)
         hit = score >= self.threshold and name is not None
         self._hits.append(hit)
-        # 窗口内命中数 >= confirm_frames
-        confirmed = sum(self._hits) >= self.confirm_frames
+        # 取最近 confirm_frames 帧，必须全部命中
+        recent = list(self._hits)[-self.confirm_frames:]
+        confirmed = len(recent) >= self.confirm_frames and all(recent)
         if confirmed and hit:
             return name, score
-        if not hit:
-            # 命中被打断，重置计数倾向
-            pass
         return None, score
 
     def reset_confirm(self) -> None:

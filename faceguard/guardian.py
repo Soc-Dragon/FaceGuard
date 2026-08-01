@@ -24,26 +24,26 @@ class Guardian:
         self._last_alert = 0.0
 
     def check(self, frame, faces, owner_name, cfg: dict) -> str | None:
-        """返回告警类型 or None。"""
+        """返回告警类型 or None。节流期内返回状态但不重复发邮件/响铃。"""
         if not self.enabled:
             return None
-        # 过滤过小人脸
         valid = [f for f in faces if f.area_ratio >= self.min_area]
         if len(valid) <= 1:
             return None
 
-        # 多张人脸：除最大那张（大概率是本人）外，其余视为入侵
-        valid.sort(key=lambda f: f.area_ratio, reverse=True)
-        intruders = valid[1:]
         now = time.time()
-        if now - self._last_alert < 8:  # 本地节流
+        # 节流期内：仍处于告警状态，但不重复触发副作用
+        if now - self._last_alert < 8:
             return "intruder"
 
+        # 过了节流期，真正触发一次告警
+        valid.sort(key=lambda f: f.area_ratio, reverse=True)
+        intruders = valid[1:]
         log.warning("检测到身后出现 %d 个他人！", len(intruders))
         if self.sound:
             _beep()
         notifier.alert_intruder(frame, cfg)
-        self._last_alert = now
+        self._last_alert = now  # 只在真正告警时更新，保证节流会过期
         return "intruder"
 
 

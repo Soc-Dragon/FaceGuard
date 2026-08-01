@@ -50,8 +50,15 @@ class Recognizer:
         self._loaded = False
 
     def init_models(self) -> bool:
-        """加载 ONNX 模型。"""
+        """加载 ONNX 模型。模型不存在时返回 False，不报错。"""
         yunet, sface = ensure_models()
+        # 先检查模型文件是否存在且有效，避免 cv2 报错噪音
+        if not yunet.exists() or yunet.stat().st_size < 1000:
+            log.warning("YuNet 模型不存在，将以降级模式运行（无人脸检测）。")
+            return False
+        if not sface.exists() or sface.stat().st_size < 1000:
+            log.warning("SFace 模型不存在，将以降级模式运行（无人脸识别）。")
+            return False
         try:
             self.detector = cv2.FaceDetectorYN_create(
                 str(yunet), "", (self.cfg.get("frame_width", 640),

@@ -310,6 +310,24 @@ def config_ui(cfg: dict) -> None:
     e_cam = glass_entry(rb, "摄像头序号", cfg["recognizer"]["camera_index"], width=10)
     e_fps = glass_entry(rb, "识别帧率", cfg["recognizer"].get("fps", 15), width=10, hint="fps")
 
+    # === 识别模型选择 ===
+    mb = glass_section(content, "识别模型", "Model · 三选一")
+    model_var = tk.StringVar(value=cfg["recognizer"].get("recognizer_type", "sface"))
+    for mt, ml, md in [("sface", "YuNet + SFace", "默认 · 99.5% · 38MB"),
+                       ("mobilefacenet", "MobileFaceNet", "轻量 · 快 · 5MB"),
+                       ("arcface", "ArcFace ResNet50", "高精度 · 99.8% · 170MB")]:
+        tk.Radiobutton(mb, text=f"{ml}  ({md})", font=FONT_LABEL, fg=TEXT_PRIMARY,
+                       bg=BG_PANEL, selectcolor=BG_DEEP, activebackground=BG_PANEL,
+                       activeforeground=ACCENT, variable=model_var, value=mt,
+                       anchor="w", relief="flat", highlightthickness=0).pack(anchor="w", pady=2)
+
+    # === 自适应学习 ===
+    ab = glass_section(content, "自适应学习", "Adaptive · 记忆脸部变化")
+    var_adaptive = tk.BooleanVar(value=cfg.get("adaptive", {}).get("enabled", True))
+    glass_toggle(ab, "成功解锁后增量学习", var_adaptive)
+    e_max = glass_entry(ab, "每用户最多", cfg.get("adaptive", {}).get("max_samples_per_user", 30), width=10, hint="样本")
+    e_cool = glass_entry(ab, "冷却秒数", cfg.get("adaptive", {}).get("cooldown_seconds", 300), width=10)
+
     # === 邮件告警 ===
     nb = glass_section(content, "邮件告警", "失败抓拍 / 入侵提醒")
     e_host = glass_entry(nb, "SMTP 服务器", cfg["notify"]["smtp_host"], width=22)
@@ -340,6 +358,11 @@ def config_ui(cfg: dict) -> None:
             cfg["recognizer"]["confirm_frames"] = int(e_cf.get())
             cfg["recognizer"]["camera_index"] = int(e_cam.get())
             cfg["recognizer"]["fps"] = int(e_fps.get())
+            cfg["recognizer"]["recognizer_type"] = model_var.get()
+            cfg.setdefault("adaptive", {})
+            cfg["adaptive"]["enabled"] = var_adaptive.get()
+            cfg["adaptive"]["max_samples_per_user"] = int(e_max.get())
+            cfg["adaptive"]["cooldown_seconds"] = int(e_cool.get())
             cfg["notify"]["smtp_host"] = e_host.get().strip()
             cfg["notify"]["sender"] = e_sender.get().strip()
             cfg["notify"]["password"] = e_pwd.get().strip()

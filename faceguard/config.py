@@ -65,6 +65,14 @@ DEFAULTS = {
         "frame_width": 640,
         "frame_height": 480,
         "fps": 15,                      # 识别帧率，降低 CPU 占用
+        "recognizer_type": "sface",     # 识别模型: sface/mobilefacenet/arcface
+    },
+    # 自适应学习（每次成功解锁后增量更新特征库）
+    "adaptive": {
+        "enabled": True,                # 总开关
+        "max_samples_per_user": 30,     # 每个用户最多保留学习样本数
+        "learn_threshold": 0.7,         # 仅在相似度 >= 该值时学习（避免学到错误特征）
+        "cooldown_seconds": 300,        # 学习冷却（同一用户 5 分钟内不重复学习）
     },
     # 邮件告警（识别失败时抓拍并寄出）
     "notify": {

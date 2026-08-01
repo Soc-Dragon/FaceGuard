@@ -27,10 +27,50 @@ MODEL_URLS = {
         "https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx",
         "https://raw.githubusercontent.com/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx",
     ],
+    # MobileFaceNet - 轻量级识别（更小更快，精度略低）
+    "face_recognition_mobilefacenet.onnx": [
+        "https://github.com/onnx/models/raw/main/validated/vision/body_analysis/arcface/model/mobilefacenet-9c9db7fc.onnx",
+        "https://raw.githubusercontent.com/onnx/models/main/validated/vision/body_analysis/arcface/model/mobilefacenet-9c9db7fc.onnx",
+    ],
+    # ArcFace - 高精度识别（模型更大，精度更高）
+    "face_recognition_arcface.onnx": [
+        "https://github.com/onnx/models/raw/main/validated/vision/body_analysis/arcface/model/resnet50-face-featurizer-v1.onnx",
+        "https://raw.githubusercontent.com/onnx/models/main/validated/vision/body_analysis/arcface/model/resnet50-face-featurizer-v1.onnx",
+    ],
 }
 
 YUNET_PATH = MODELS_DIR / "face_detection_yunet_2023mar.onnx"
 SFACE_PATH = MODELS_DIR / "face_recognition_sface_2021dec.onnx"
+MOBILEFACENET_PATH = MODELS_DIR / "face_recognition_mobilefacenet.onnx"
+ARCFACE_PATH = MODELS_DIR / "face_recognition_arcface.onnx"
+
+# 可选识别模型：供用户在设置中选择
+RECOGNIZER_MODELS = {
+    "sface": {
+        "path": SFACE_PATH,
+        "name": "YuNet + SFace",
+        "desc": "默认 · 精度99.5% · 38MB",
+        "embedding_size": 128,
+        "threshold": 0.55,
+        "type": "opencv_sf",  # 使用 cv2.FaceRecognizerSF
+    },
+    "mobilefacenet": {
+        "path": MOBILEFACENET_PATH,
+        "name": "MobileFaceNet",
+        "desc": "轻量 · 速度快 · 5MB",
+        "embedding_size": 192,
+        "threshold": 0.45,
+        "type": "onnx_dnn",  # 使用 cv2.dnn 读 ONNX
+    },
+    "arcface": {
+        "path": ARCFACE_PATH,
+        "name": "ArcFace (ResNet50)",
+        "desc": "高精度 · 99.8% · 170MB",
+        "embedding_size": 512,
+        "threshold": 0.50,
+        "type": "onnx_dnn",
+    },
+}
 
 
 def _ensure_dir(path: Path) -> bool:
@@ -182,68 +222,69 @@ def _bundled_models_dir() -> Path | None:
     return None
 
 
-def ensure_models() -> tuple[Path, Path]:
-    """确保两个模型文件就位，返回 (yunet_path, sface_path)。
+def _ensure_model_file(target: Path) -> bool:
+    """三级优先级加载单个模型文件：用户目录 → 包内 → 联网下载。返回是否成功。"""
+    # 优先级 1: 用户目录已有
+    try:
+        if target.exists() and target.stat().st_size > 1000:
+            return True
+    except OSError:
+        pass
 
-    优先级：
-    1. 用户数据目录已有模型（%APPDATA%/FaceGuard/models）
-    2. PyInstaller 包内模型（无需下载）
-    3. 联网下载到用户数据目录
-    任何下载失败都返回路径（由调用方决定是否降级为无模型模式）。
+    # 优先级 2: PyInstaller 包内
+    bundled = _bundled_models_dir()
+    if bundled is not None:
+        b = bundled / target.name
+        try:
+            if b.exists() and b.stat().st_size > 1000:
+                import shutil
+                shutil.copy2(b, target)
+                print(f"[FaceGuard] 从安装包复制 {target.name} 到用户目录。", flush=True)
+                return True
+        except OSError:
+            pass
+
+    # 优先级 3: 联网下载
+    urls = MODEL_URLS.get(target.name, [])
+    if not urls:
+        return False
+    return _download(urls, target, target.name)
+
+
+def ensure_models(recognizer_type: str = "sface") -> tuple[Path, Path | None]:
+    """确保模型文件就位。
+
+    Args:
+        recognizer_type: 用户选择的识别模型 'sface'/'mobilefacenet'/'arcface'
+
+    Returns:
+        (yunet_path, recognizer_path) - recognizer_path 可能为 None（加载失败时）
     """
-    yunet_ok = False
-    sface_ok = False
-
-    # 防御: MODELS_DIR 必须有效
     if not _ensure_dir(MODELS_DIR):
         if not _ensure_dir(APP_DIR):
             print("[FaceGuard] 无法创建数据目录，模型加载将跳过。", flush=True)
-            return YUNET_PATH, SFACE_PATH
+            return YUNET_PATH, None
 
-    # ---- 优先级 1: 用户数据目录已有 ----
-    if YUNET_PATH.exists() and YUNET_PATH.stat().st_size > 1000:
-        yunet_ok = True
-    if SFACE_PATH.exists() and SFACE_PATH.stat().st_size > 1000:
-        sface_ok = True
-
-    if yunet_ok and sface_ok:
-        return YUNET_PATH, SFACE_PATH
-
-    # ---- 优先级 2: PyInstaller 包内模型 ----
-    bundled = _bundled_models_dir()
-    if bundled is not None:
-        by = bundled / YUNET_PATH.name
-        bs = bundled / SFACE_PATH.name
-        if by.exists() and by.stat().st_size > 1000 and not yunet_ok:
-            # 复制到用户数据目录（便于后续独立使用）
-            try:
-                import shutil
-                shutil.copy2(by, YUNET_PATH)
-                yunet_ok = True
-                print(f"[FaceGuard] 从安装包复制 YuNet 模型到用户目录。", flush=True)
-            except OSError:
-                pass
-        if bs.exists() and bs.stat().st_size > 1000 and not sface_ok:
-            try:
-                import shutil
-                shutil.copy2(bs, SFACE_PATH)
-                sface_ok = True
-                print(f"[FaceGuard] 从安装包复制 SFace 模型到用户目录。", flush=True)
-            except OSError:
-                pass
-
-    if yunet_ok and sface_ok:
-        return YUNET_PATH, SFACE_PATH
-
-    # ---- 优先级 3: 联网下载 ----
+    # YuNet 检测器是必须的
+    yunet_ok = _ensure_model_file(YUNET_PATH)
     if not yunet_ok:
-        yunet_ok = _download(MODEL_URLS[YUNET_PATH.name], YUNET_PATH, "YuNet 人脸检测模型")
-    if not sface_ok:
-        sface_ok = _download(MODEL_URLS[SFACE_PATH.name], SFACE_PATH, "SFace 人脸识别模型")
+        print("[FaceGuard] YuNet 检测模型加载失败。", flush=True)
 
-    if not yunet_ok or not sface_ok:
-        print("[FaceGuard] 部分模型加载失败，将以降级模式运行（无人脸检测）。", flush=True)
-        print(f"  YuNet: {'OK' if yunet_ok else '缺失'}", flush=True)
-        print(f"  SFace: {'OK' if sface_ok else '缺失'}", flush=True)
+    # 根据用户选择加载对应识别模型
+    rec_info = RECOGNIZER_MODELS.get(recognizer_type, RECOGNIZER_MODELS["sface"])
+    rec_path = rec_info["path"]
+    rec_ok = _ensure_model_file(rec_path)
 
-    return YUNET_PATH, SFACE_PATH
+    # 如果用户选的模型加载失败，自动回退到 SFace（默认打包的）
+    if not rec_ok and recognizer_type != "sface":
+        print(f"[FaceGuard] {rec_info['name']} 加载失败，回退到默认 SFace。", flush=True)
+        rec_info = RECOGNIZER_MODELS["sface"]
+        rec_path = rec_info["path"]
+        rec_ok = _ensure_model_file(rec_path)
+
+    if not rec_ok:
+        print(f"[FaceGuard] 识别模型加载失败，将以降级模式运行。", flush=True)
+        return YUNET_PATH, None
+
+    print(f"[FaceGuard] 识别模型: {rec_info['name']} ({rec_info['desc']})", flush=True)
+    return YUNET_PATH, rec_path

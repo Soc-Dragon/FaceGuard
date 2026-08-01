@@ -94,6 +94,26 @@ def unlock_session(cfg: dict) -> None:
         log.debug("会话唤醒失败: %s", e)
 
 
+def _alert_dialog(title: str, message: str, icon: str = "warning") -> None:
+    """无控制台模式下弹出对话框（--windowed 打包时唯一可见反馈）。"""
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        if icon == "error":
+            messagebox.showerror(title, message, parent=root)
+        elif icon == "info":
+            messagebox.showinfo(title, message, parent=root)
+        else:
+            messagebox.showwarning(title, message, parent=root)
+        root.destroy()
+    except Exception:
+        # tkinter 不可用时回退到 print
+        print(f"[{title}] {message}")
+
+
 def run_guard(cfg: dict) -> None:
     """主守护循环。"""
     rcfg = cfg["recognizer"]
@@ -103,18 +123,53 @@ def run_guard(cfg: dict) -> None:
                  rcfg.get("fps", 15))
     if not cam.open():
         log.error("摄像头打开失败，5 秒后重试...")
-        time.sleep(5)
+        _alert_dialog(
+            "FaceGuard · 摄像头错误",
+            "无法打开摄像头（序号 %s）。\n\n"
+            "请检查：\n"
+            "1. 摄像头是否被其他程序占用\n"
+            "2. 摄像头是否已连接\n"
+            "3. 在「设置」中更换摄像头序号" % rcfg.get("camera_index", 0),
+            "error",
+        )
         return
 
     rec = Recognizer(cfg)
     if not rec.init_models():
         log.error("模型初始化失败。")
         cam.release()
+        _alert_dialog(
+            "FaceGuard · 模型加载失败",
+            "人脸识别模型加载失败。\n\n"
+            "可能原因：\n"
+            "1. 首次运行需联网下载模型\n"
+            "2. 模型文件损坏\n\n"
+            "请检查网络后重试，或重新安装。",
+            "error",
+        )
         return
 
     if not rec.has_enrolled():
         log.warning("尚未注册任何人脸！请先运行 --enroll 完成注册。")
         cam.release()
+        # 询问是否立即注册
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            ans = messagebox.askyesno(
+                "FaceGuard · 尚未注册人脸",
+                "尚未注册任何人脸，守护无法启动。\n\n"
+                "是否立即注册本人人脸？",
+                parent=root,
+            )
+            root.destroy()
+            if ans:
+                enroll_interactive(cfg)
+        except Exception as e:
+            log.error("无法启动注册引导: %s", e)
         return
 
     guardian = Guardian(cfg)
@@ -419,7 +474,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if ok else 1
 
     # 默认：启动守护
-    run_guard(cfg)
+    try:
+        run_guard(cfg)
+    except Exception as e:
+        log.exception("守护异常退出")
+        _alert_dialog(
+            "FaceGuard · 异常退出",
+            f"程序遇到错误：\n{e}\n\n请截图此错误并反馈。",
+            "error",
+        )
+        return 1
     return 0
 
 

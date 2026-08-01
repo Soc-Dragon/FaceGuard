@@ -13,17 +13,37 @@ import signal
 import sys
 import time
 
-from . import __version__
-from .camera import Camera
-from .config import LOG_DIR, load_config, save_config
-from .enroll import enroll_interactive
-from .guardian import Guardian
-from .locker import current_executable, is_workstation_locked, lock_workstation, suspend
-from .notifier import alert_recognition_failed
-from .overlay import render_overlay
-from .presence import Presence
-from .recognizer import Recognizer
-from .ui import OverlayWindow
+# 支持两种入口：
+#   1. python -m faceguard         （包模式，相对导入正常）
+#   2. python faceguard/__main__.py（脚本模式，需回退到绝对导入）
+# PyInstaller 打包用顶层 run.py，走包模式，本回退仅作兜底。
+if __package__ in (None, ""):
+    # 被当顶层脚本运行，把父目录加入 sys.path 并用绝对导入
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from faceguard import __version__
+    from faceguard.camera import Camera
+    from faceguard.config import LOG_DIR, load_config, save_config
+    from faceguard.enroll import enroll_interactive
+    from faceguard.guardian import Guardian
+    from faceguard.locker import current_executable, is_workstation_locked, lock_workstation, suspend
+    from faceguard.notifier import alert_recognition_failed
+    from faceguard.overlay import render_overlay
+    from faceguard.presence import Presence
+    from faceguard.recognizer import Recognizer
+    from faceguard.ui import OverlayWindow
+else:
+    from . import __version__
+    from .camera import Camera
+    from .config import LOG_DIR, load_config, save_config
+    from .enroll import enroll_interactive
+    from .guardian import Guardian
+    from .locker import current_executable, is_workstation_locked, lock_workstation, suspend
+    from .notifier import alert_recognition_failed
+    from .overlay import render_overlay
+    from .presence import Presence
+    from .recognizer import Recognizer
+    from .ui import OverlayWindow
 
 log = logging.getLogger("faceguard")
 

@@ -16,7 +16,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).parent
-ENTRY = ROOT / "faceguard" / "__main__.py"
+ENTRY = ROOT / "run.py"   # 顶层入口，避免包内相对导入失败
 DIST = ROOT / "dist"
 BUILD = ROOT / "build"
 

@@ -7,8 +7,12 @@ from __future__ import annotations
 
 import ctypes
 import sys
-import winreg
 from pathlib import Path
+
+try:
+    import winreg  # Windows only
+except ImportError:  # 非 Windows（沙盒验证用）
+    winreg = None
 
 from .config import APP_DIR
 
@@ -65,6 +69,8 @@ RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 def set_autostart(exe_path: Path | str, key_name: str = "FaceGuard") -> bool:
     """写入 HKCU 启动项，开机 / 登录后自动运行。"""
+    if winreg is None:
+        return False
     try:
         val = f'"{Path(exe_path)}" --silent'
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
@@ -77,6 +83,8 @@ def set_autostart(exe_path: Path | str, key_name: str = "FaceGuard") -> bool:
 
 def clear_autostart(key_name: str = "FaceGuard") -> bool:
     """移除启动项。"""
+    if winreg is None:
+        return False
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
             winreg.DeleteValue(k, key_name)
@@ -89,6 +97,8 @@ def clear_autostart(key_name: str = "FaceGuard") -> bool:
 
 
 def is_autostart_set(key_name: str = "FaceGuard") -> bool:
+    if winreg is None:
+        return False
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_READ) as k:
             winreg.QueryValueEx(k, key_name)

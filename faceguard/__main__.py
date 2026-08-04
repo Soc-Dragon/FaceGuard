@@ -153,13 +153,17 @@ def run_guard(cfg: dict, silent: bool = False) -> int:
         log.error("模型初始化失败。")
         cam.release()
         if not silent:
+            err_detail = getattr(rec, '_last_error', '未知错误') or '未知错误'
             _alert_dialog(
                 "FaceGuard · 模型加载失败",
-                "人脸识别模型加载失败。\n\n"
-                "可能原因：\n"
-                "1. 首次运行需联网下载模型\n"
-                "2. 模型文件损坏\n\n"
-                "请检查网络后重试，或重新安装。",
+                f"{err_detail}\n\n"
+                "解决方法：\n"
+                "1. 检查网络连接后重试\n"
+                "2. 手动下载模型并放入以下目录：\n"
+                "   Windows: %APPDATA%\\FaceGuard\\models\\\n"
+                "   必须文件: face_detection_yunet_2023mar.onnx\n"
+                "            face_recognition_sface_2021dec.onnx\n\n"
+                "3. 重新安装 FaceGuard（确保模型打包正确）",
                 "error",
             )
         return 2

@@ -61,6 +61,7 @@ class Recognizer:
         self._hits = deque(maxlen=max(self.match_window, self.confirm_frames))
         self._db: list[tuple[str, np.ndarray]] = []
         self._loaded = False
+        self._last_error: str | None = None
         # 自适应学习状态
         self._learn_history: list[tuple[str, np.ndarray, float]] = []  # (name, emb, score)
         self._last_learn_time: dict[str, float] = {}  # 每个用户的上次学习时间
@@ -71,10 +72,15 @@ class Recognizer:
         yunet, rec_path = ensure_models(self.recognizer_type)
         # 检查 YuNet
         if not yunet.exists() or yunet.stat().st_size < 1000:
-            log.warning("YuNet 模型不存在，将以降级模式运行（无人脸检测）。")
+            log.error("YuNet 检测模型缺失: %s (大小: %s)",
+                      yunet, yunet.stat().st_size if yunet.exists() else "不存在")
+            self._last_error = f"YuNet 检测模型加载失败\n路径: {yunet}"
             return False
         if rec_path is None or not rec_path.exists() or rec_path.stat().st_size < 1000:
-            log.warning("识别模型不存在，将以降级模式运行（无人脸识别）。")
+            log.error("识别模型缺失: %s (大小: %s)",
+                      rec_path, rec_path.stat().st_size if rec_path and rec_path.exists() else "不存在")
+            model_name = RECOGNIZER_MODELS.get(self.recognizer_type, RECOGNIZER_MODELS["sface"]).get("name", self.recognizer_type)
+            self._last_error = f"识别模型加载失败 ({model_name})\n路径: {rec_path}"
             return False
 
         # 获取模型信息
@@ -91,18 +97,22 @@ class Recognizer:
                                  self.cfg.get("frame_height", 480)),
                 score_threshold=0.6, nms_threshold=0.3, top_k=10,
             )
+            log.info("YuNet 检测器加载成功: %s (%d KB)", yunet, yunet.stat().st_size // 1024)
             # 识别器
             if self._rec_type == "opencv_sf":
                 self.recognizer = cv2.FaceRecognizerSF_create(str(rec_path), "")
             else:
-                # onnx_dnn: 用 cv2.dnn 读 ONNX
                 self.recognizer = cv2.dnn.readNetFromONNX(str(rec_path))
-            log.info(f"识别模型加载完成: {self._rec_info['name']} ({self._rec_info['desc']})")
+            log.info("识别模型加载完成: %s (%s) 大小: %d KB",
+                     self._rec_info['name'], self._rec_info['desc'],
+                     rec_path.stat().st_size // 1024)
+            self._last_error = None
             return True
         except Exception as e:
-            log.error("模型加载失败: %s", e)
+            log.error("OpenCV 模型初始化异常: %s", e)
             self.detector = None
             self.recognizer = None
+            self._last_error = f"OpenCV 模型初始化失败: {e}"
             return False
 
     # ---------- 特征库 ----------
